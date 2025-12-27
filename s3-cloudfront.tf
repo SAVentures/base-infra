@@ -145,18 +145,11 @@ resource "aws_cloudfront_distribution" "webapp_distribution" {
     cached_methods   = ["GET", "HEAD"]
     target_origin_id = "ALB-API"
 
-    forwarded_values {
-      query_string = true
-      headers      = ["Authorization", "Content-Type", "Accept", "Origin"]
-      cookies {
-        forward = "all"
-      }
-    }
+    # Use origin request policy for forwarding headers (modern approach)
+    cache_policy_id          = aws_cloudfront_cache_policy.api_cache_policy.id
+    origin_request_policy_id = aws_cloudfront_origin_request_policy.api_origin_request_policy.id
 
     viewer_protocol_policy = "redirect-to-https"
-    min_ttl                = 0
-    default_ttl            = 0
-    max_ttl                = 0
     compress               = true
   }
 
@@ -175,6 +168,66 @@ resource "aws_cloudfront_distribution" "webapp_distribution" {
   tags = {
     Name        = "Webapp CloudFront Distribution"
     Environment = var.environment
+  }
+}
+
+# Cache Policy for API - No caching
+resource "aws_cloudfront_cache_policy" "api_cache_policy" {
+  name        = "api-no-cache-policy"
+  comment     = "No caching for API requests"
+  default_ttl = 0
+  max_ttl     = 0
+  min_ttl     = 0
+
+  parameters_in_cache_key_and_forwarded_to_origin {
+    cookies_config {
+      cookie_behavior = "none"
+    }
+    headers_config {
+      header_behavior = "none"
+    }
+    query_strings_config {
+      query_string_behavior = "none"
+    }
+  }
+}
+
+# Origin Request Policy for API - Forward viewer headers for real IP detection
+# Note: Authorization header is automatically forwarded and cannot be in the whitelist
+resource "aws_cloudfront_origin_request_policy" "api_origin_request_policy" {
+  name    = "api-origin-request-policy"
+  comment = "Forward headers needed for API including viewer address, geo, and device info"
+
+  cookies_config {
+    cookie_behavior = "all"
+  }
+
+  headers_config {
+    # allViewerAndWhitelistCloudFront forwards all viewer headers (Content-Type, Accept, etc.)
+    # PLUS allows whitelisting CloudFront-* headers (up to 10)
+    # Device/OS detection done via User-Agent parsing server-side
+    header_behavior = "allViewerAndWhitelistCloudFront"
+    headers {
+      items = [
+        # Viewer address (IP:port)
+        "CloudFront-Viewer-Address",
+        # Geographic data (full coverage)
+        "CloudFront-Viewer-Country",
+        "CloudFront-Viewer-Country-Region",
+        "CloudFront-Viewer-City",
+        "CloudFront-Viewer-Postal-Code",
+        "CloudFront-Viewer-Metro-Code",
+        "CloudFront-Viewer-Time-Zone",
+        "CloudFront-Viewer-Latitude",
+        "CloudFront-Viewer-Longitude",
+        # Device detection (mobile is most important, others via User-Agent)
+        "CloudFront-Is-Mobile-Viewer",
+      ]
+    }
+  }
+
+  query_strings_config {
+    query_string_behavior = "all"
   }
 }
 
