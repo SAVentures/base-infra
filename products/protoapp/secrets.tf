@@ -206,3 +206,9 @@ resource "aws_ssm_parameter" "oauth_redirect_base" {
   type  = "String"
   value = "https://${var.domain_name}"
 }
+
+resource "aws_ssm_parameter" "storage_type" {
+  name  = "/${var.product}/storage_type"
+  type  = "String"
+  value = "s3" # flip to "local" per-product if you don't want S3 media
+}
