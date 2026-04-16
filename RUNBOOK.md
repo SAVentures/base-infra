@@ -1,234 +1,138 @@
-# Runbook: migrate protoapp to the platform + product pattern
+# Runbook
 
-This PR restructures the existing infra into two Terraform stacks:
+Two stacks in this PR are now applied to AWS:
 
-- `platform/` — shared: VPC, RDS, ECS cluster, ALB, Kafka, IAM roles, `/platform/rds/*` SSM
-- `products/protoapp/` — protoapp-only: S3, CloudFront, ACM, ECS service, target group, listener rule, per-product SSM, Cloudflare DNS
+- `platform/` — shared VPC, RDS, ECS cluster, ALB, Kafka. State at `s3://protoapp-infra-terraform-state/state/terraform.tfstate`.
+- `products/protoapp/` — protoapp.xyz live, ECS service, CloudFront, S3, SSM. State at `s3://protoapp-terraform-state/state/terraform.tfstate`.
+- `products/launchcamp/` — `app.launchcamp.xyz` SaaS, CloudFront, S3, ECS service `launchcamp-api`, SSM. State at `s3://launchcamp-terraform-state/state/terraform.tfstate`.
 
-**The code in this PR matches existing AWS resources exactly** (same names, same SSM paths, same config). After the migration, `terraform plan` on both stacks should show zero changes — nothing is recreated, nothing is modified. We're just relocating resources between Terraform states.
+The launchcamp landing page (apex `launchcamp.xyz` and `www.launchcamp.xyz`) is intentionally not managed here — it lives on Cloudflare Pages and is untouched.
 
-Everything still works while migration happens. No downtime.
+## Routing model on the shared ALB
 
-## 0. Prerequisites
+| Priority | Match | Target |
+|---|---|---|
+| 100 | path `/api/*` AND header `X-Product-Id=launchcamp` | launchcamp target group |
+| 1000 | path `/api/*` (no header) | protoapp target group |
+| default | (any /\* not matched above) | 404 |
 
-- AWS CLI authenticated
-- Terraform >= 1.2
-- `gh` CLI as protoappxyz
-- Cloudflare provider API key at SSM `/cloudflare/api_key` (already exists)
-- **Branch checked out locally**: `git checkout terraform-parameterize && git pull`
+Each product's CloudFront origin injects the `X-Product-Id` header so the ALB can dispatch.
 
-## 1. Create the new state bucket for protoapp product
+## What was done in this PR (already applied)
 
-```bash
-aws s3api create-bucket --bucket protoapp-terraform-state --region us-east-1
-aws s3api put-bucket-versioning --bucket protoapp-terraform-state --versioning-configuration Status=Enabled
-aws s3api put-bucket-encryption --bucket protoapp-terraform-state \
-  --server-side-encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
-```
+- Migrated all protoapp-specific resources from the original single-stack into `products/protoapp/` via `terraform state rm` + `terraform import` (zero recreation).
+- Upgraded Cloudflare provider to v5 in `products/protoapp/` (cloudflare_record → cloudflare_dns_record, value → content, cloudflare_zone_settings_override → 5x cloudflare_zone_setting).
+- Lowered protoapp's ALB listener rule priority from 1 → 1000 to make room for launchcamp at priority 100.
+- Created `products/launchcamp/` with state in new bucket `launchcamp-terraform-state`. Applied: ACM cert (validated), Cloudflare DNS for `app.launchcamp.xyz`, S3 bucket `app.launchcamp.xyz-webapp`, CloudFront distribution, ECS service `launchcamp-api`, ALB target group + listener rule, 14 SSM placeholders.
 
-## 2. Initialize both stacks
+## What's left to make launchcamp actually serve traffic
 
-```bash
-cd infra-setup/platform
-terraform init   # uses existing protoapp-infra-terraform-state (unchanged)
+The ECS service `launchcamp-api` is deployed but tasks are unhealthy until the database exists and SSM secrets hold real values.
 
-cd ../products/protoapp
-cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars with your cloudflare_email
-terraform init   # initializes fresh state in protoapp-terraform-state
-```
-
-## 3. Extract AWS IDs from the current platform state
-
-Run these from `infra-setup/platform/` to get IDs we'll need for imports:
+### 1. Create the launchcamp database on shared RDS
 
 ```bash
-cd infra-setup/platform
+INSTANCE_ID=$(aws ec2 describe-instances \
+  --filters "Name=tag:Name,Values=ECS AutoScaling Group" "Name=instance-state-name,Values=running" \
+  --query 'Reservations[0].Instances[0].InstanceId' --output text)
 
-CLOUDFRONT_ID=$(terraform state show aws_cloudfront_distribution.webapp_distribution | awk '/^ *id *=/ {gsub(/"/,"",$3); print $3; exit}')
-ACM_CERT_ARN=$(terraform state show aws_acm_certificate.ssl_cert | awk '/^ *arn *=/ {gsub(/"/,"",$3); print $3; exit}')
-OAC_ID=$(terraform state show aws_cloudfront_origin_access_control.webapp_oac | awk '/^ *id *=/ {gsub(/"/,"",$3); print $3; exit}')
-CF_FUNCTION_ETAG=$(terraform state show aws_cloudfront_function.spa_routing | awk '/^ *etag *=/ {gsub(/"/,"",$3); print $3; exit}')
-CACHE_POLICY_ID=$(terraform state show aws_cloudfront_cache_policy.api_cache_policy | awk '/^ *id *=/ {gsub(/"/,"",$3); print $3; exit}')
-ORIGIN_REQ_POLICY_ID=$(terraform state show aws_cloudfront_origin_request_policy.api_origin_request_policy | awk '/^ *id *=/ {gsub(/"/,"",$3); print $3; exit}')
-TARGET_GROUP_ARN=$(terraform state show aws_alb_target_group.ecs_target | awk '/^ *arn *=/ {gsub(/"/,"",$3); print $3; exit}')
-LISTENER_RULE_ARN=$(terraform state show aws_lb_listener_rule.alb_listener_rule_api_http | awk '/^ *arn *=/ {gsub(/"/,"",$3); print $3; exit}')
-ECS_CLUSTER_NAME=$(terraform state show aws_ecs_cluster.ecs_cluster | awk '/^ *name *=/ {gsub(/"/,"",$3); print $3; exit}')
-TASK_DEF_ARN=$(terraform state show aws_ecs_task_definition.task_definition | awk '/^ *arn *=/ {gsub(/"/,"",$3); print $3; exit}')
-ACM_VALIDATION_RECORD_IDS=$(terraform state list | grep 'cloudflare_record.acm_validation')
+RDS_HOST=$(aws ssm get-parameter --name /platform/rds/host --query Parameter.Value --output text)
+RDS_MASTER_USER=$(aws ssm get-parameter --name /platform/rds/master_username --with-decryption --query Parameter.Value --output text)
+RDS_MASTER_PASS=$(aws ssm get-parameter --name /platform/rds/master_password --with-decryption --query Parameter.Value --output text)
 
-# Cloudflare record IDs need a per-record lookup
-CF_ROOT_RECORD_ID=$(terraform state show cloudflare_record.root_to_cloudfront | awk '/^ *id *=/ {gsub(/"/,"",$3); print $3; exit}')
-CF_WWW_RECORD_ID=$(terraform state show cloudflare_record.www_to_cloudfront | awk '/^ *id *=/ {gsub(/"/,"",$3); print $3; exit}')
-CF_ZONE_ID="e1fcf5e6c9b60043f75049228a8e3088"
-
-echo "CloudFront distribution: $CLOUDFRONT_ID"
-echo "ACM cert: $ACM_CERT_ARN"
-echo "Target group: $TARGET_GROUP_ARN"
-echo "Listener rule: $LISTENER_RULE_ARN"
-echo "Task def: $TASK_DEF_ARN"
+# Port-forward (blocks; run in a separate terminal)
+aws ssm start-session --target "$INSTANCE_ID" \
+  --document-name AWS-StartPortForwardingSessionToRemoteHost \
+  --parameters "{\"host\":[\"$RDS_HOST\"],\"portNumber\":[\"5432\"],\"localPortNumber\":[\"15432\"]}"
 ```
 
-Keep this terminal open — you'll use these variables in subsequent steps.
-
-## 4. Remove resources from platform state
-
-Run from `infra-setup/platform/`:
+Then in another terminal:
 
 ```bash
-# SSM parameters (17)
-terraform state rm aws_ssm_parameter.db_endpoint
-terraform state rm aws_ssm_parameter.db_username
-terraform state rm aws_ssm_parameter.db_password
-terraform state rm aws_ssm_parameter.db_name
-terraform state rm aws_ssm_parameter.jwt_secret
-terraform state rm aws_ssm_parameter.google_client_id
-terraform state rm aws_ssm_parameter.google_client_secret
-terraform state rm aws_ssm_parameter.google_redirect_uri
-terraform state rm aws_ssm_parameter.web_app_uri
-terraform state rm aws_ssm_parameter.stripe_publishable_key
-terraform state rm aws_ssm_parameter.stripe_secret_key
-terraform state rm aws_ssm_parameter.stripe_webhook_secret
-terraform state rm aws_ssm_parameter.resend_api_key
-terraform state rm aws_ssm_parameter.default_email_sender_address
-terraform state rm aws_ssm_parameter.gemini_api_key
-terraform state rm aws_ssm_parameter.openai_api_key
-terraform state rm aws_ssm_parameter.turnstile_secret_key
+LAUNCHCAMP_APP_PASS=$(openssl rand -base64 24 | tr -d '/+=' | head -c 24)
 
-# Random string (no AWS resource, just local state)
-terraform state rm random_string.jwt_secret
+PGPASSWORD="$RDS_MASTER_PASS" psql -h localhost -p 15432 -U "$RDS_MASTER_USER" -d postgres <<EOF
+CREATE DATABASE launchcamp;
+CREATE USER launchcamp_app WITH PASSWORD '$LAUNCHCAMP_APP_PASS';
+GRANT ALL PRIVILEGES ON DATABASE launchcamp TO launchcamp_app;
+EOF
 
-# ALB target group + listener rule
-terraform state rm aws_alb_target_group.ecs_target
-terraform state rm aws_lb_listener_rule.alb_listener_rule_api_http
-
-# ECS service + task def + log group
-terraform state rm aws_ecs_service.ecs_service
-terraform state rm aws_ecs_task_definition.task_definition
-terraform state rm aws_cloudwatch_log_group.ecs_log_group
-
-# S3 + CloudFront + OAC + function + policies
-terraform state rm aws_s3_bucket.webapp_bucket
-terraform state rm aws_s3_bucket_public_access_block.webapp_bucket_public_access
-terraform state rm aws_s3_bucket_policy.webapp_bucket_policy
-terraform state rm aws_cloudfront_origin_access_control.webapp_oac
-terraform state rm aws_cloudfront_function.spa_routing
-terraform state rm aws_cloudfront_distribution.webapp_distribution
-terraform state rm aws_cloudfront_cache_policy.api_cache_policy
-terraform state rm aws_cloudfront_origin_request_policy.api_origin_request_policy
-terraform state rm aws_cloudwatch_log_group.cloudfront_logs
-
-# ACM + Cloudflare DNS
-terraform state rm aws_acm_certificate.ssl_cert
-for r in $(terraform state list | grep 'cloudflare_record.acm_validation'); do
-  terraform state rm "$r"
-done
-terraform state rm cloudflare_record.root_to_cloudfront
-terraform state rm cloudflare_record.www_to_cloudfront
-terraform state rm cloudflare_zone_settings_override.ssl_tls_settings
+aws ssm put-parameter --name /launchcamp/db_username --type SecureString --value launchcamp_app --overwrite
+aws ssm put-parameter --name /launchcamp/db_password --type SecureString --value "$LAUNCHCAMP_APP_PASS" --overwrite
 ```
 
-Verify platform state is now generic-only:
+Stop the port-forward when done. Run Flyway migrations from the base-server repo against this new DB.
+
+### 2. Register external services for launchcamp
+
+- **Google Cloud Console**: new OAuth client. Authorized redirect URI: `https://app.launchcamp.xyz/api/auth/google/callback`. Capture client_id + client_secret.
+- **Stripe**: live-mode keys. Webhook endpoint: `https://app.launchcamp.xyz/api/webhooks/stripe` (path may differ — match your handler). Capture publishable_key + secret_key + webhook signing secret.
+- **Resend**: verify `launchcamp.xyz` as a sending domain (DKIM + SPF TXT records on the apex zone). Reuse existing API key or generate a new one.
+- **Turnstile**: new site for `app.launchcamp.xyz`. Capture site_key + secret.
+
+### 3. Populate launchcamp SSM params
 
 ```bash
-terraform state list | sort
+aws ssm put-parameter --name /launchcamp/jwt_secret --type SecureString --value "$(openssl rand -hex 32)" --overwrite
+aws ssm put-parameter --name /launchcamp/google_client_id --type String --value "<id>" --overwrite
+aws ssm put-parameter --name /launchcamp/google_client_secret --type SecureString --value "<secret>" --overwrite
+aws ssm put-parameter --name /launchcamp/stripe_publishable_key --type String --value "<pk_live_...>" --overwrite
+aws ssm put-parameter --name /launchcamp/stripe_secret_key --type SecureString --value "<sk_live_...>" --overwrite
+aws ssm put-parameter --name /launchcamp/stripe_webhook_secret --type SecureString --value "<whsec_...>" --overwrite
+aws ssm put-parameter --name /launchcamp/resend_api_key --type SecureString --value "<re_...>" --overwrite
+aws ssm put-parameter --name /launchcamp/default_email_sender_address --type String --value "no-reply@launchcamp.xyz" --overwrite
+aws ssm put-parameter --name /launchcamp/gemini_api_key --type SecureString --value "<key>" --overwrite
+aws ssm put-parameter --name /launchcamp/openai_api_key --type SecureString --value "<key>" --overwrite
+aws ssm put-parameter --name /launchcamp/turnstile_site_key --type String --value "<site key>" --overwrite
+aws ssm put-parameter --name /launchcamp/turnstile_secret_key --type SecureString --value "<secret>" --overwrite
 ```
 
-Expected: VPC, subnets, IGW, route tables, NACLs, security groups, RDS, RDS subnet group, ECS cluster, IAM roles, instance profile, launch config, ASG, EFS (Kafka), Kafka service discovery, Kafka task def, Kafka service, Kafka log group, ALB, HTTP listener, random_strings for db. And the new `/platform/rds/*` SSM params.
-
-## 5. Import resources into protoapp product state
-
-Run from `infra-setup/products/protoapp/`:
+### 4. Force a new ECS deployment so tasks pick up the new env
 
 ```bash
-cd ../products/protoapp
-
-# SSM parameters — name = import ID
-terraform import aws_ssm_parameter.db_endpoint /db_secrets/protoapp_db_endpoint
-terraform import aws_ssm_parameter.db_username /db_secrets/protoapp_db_username
-terraform import aws_ssm_parameter.db_password /db_secrets/protoapp_db_password
-terraform import aws_ssm_parameter.db_name /db_secrets/protoapp_db_name
-terraform import aws_ssm_parameter.jwt_secret /jwt_secrets/protoapp_jwt_secret
-terraform import aws_ssm_parameter.google_client_id /google_secrets/protoapp_google_client_id
-terraform import aws_ssm_parameter.google_client_secret /google_secrets/protoapp_google_client_secret
-terraform import aws_ssm_parameter.google_redirect_uri /google_secrets/protoapp_google_redirect_uri
-terraform import aws_ssm_parameter.web_app_uri /api_service/protoapp_web_app_uri
-terraform import aws_ssm_parameter.stripe_publishable_key /stripe_secrets/protoapp_stripe_publishable_key
-terraform import aws_ssm_parameter.stripe_secret_key /stripe_secrets/protoapp_stripe_secret_key
-terraform import aws_ssm_parameter.stripe_webhook_secret /stripe_secrets/protoapp_stripe_webhook_secret
-terraform import aws_ssm_parameter.resend_api_key /api_service/protoapp_resend_api_key
-terraform import aws_ssm_parameter.default_email_sender_address /api_service/protoapp_default_email_sender_address
-terraform import aws_ssm_parameter.gemini_api_key /api_service/protoapp_gemini_api_key
-terraform import aws_ssm_parameter.openai_api_key /api_service/protoapp_openai_api_key
-terraform import aws_ssm_parameter.turnstile_secret_key /api_service/protoapp_turnstile_secret_key
-
-# ALB target group + listener rule (ARNs from step 3)
-terraform import aws_alb_target_group.ecs_target "$TARGET_GROUP_ARN"
-terraform import aws_lb_listener_rule.alb_listener_rule_api_http "$LISTENER_RULE_ARN"
-
-# ECS: cluster/service format for service, arn for task def, name for log group
-terraform import aws_ecs_service.ecs_service "$ECS_CLUSTER_NAME/api_service"
-terraform import aws_ecs_task_definition.task_definition "$TASK_DEF_ARN"
-terraform import aws_cloudwatch_log_group.ecs_log_group api-logs
-
-# S3 — bucket name
-terraform import aws_s3_bucket.webapp_bucket protoapp.xyz-webapp
-terraform import aws_s3_bucket_public_access_block.webapp_bucket_public_access protoapp.xyz-webapp
-terraform import aws_s3_bucket_policy.webapp_bucket_policy protoapp.xyz-webapp
-
-# CloudFront
-terraform import aws_cloudfront_origin_access_control.webapp_oac "$OAC_ID"
-terraform import aws_cloudfront_function.spa_routing "spa-routing-function"
-terraform import aws_cloudfront_distribution.webapp_distribution "$CLOUDFRONT_ID"
-terraform import aws_cloudfront_cache_policy.api_cache_policy "$CACHE_POLICY_ID"
-terraform import aws_cloudfront_origin_request_policy.api_origin_request_policy "$ORIGIN_REQ_POLICY_ID"
-terraform import aws_cloudwatch_log_group.cloudfront_logs /aws/cloudfront/webapp
-
-# ACM cert
-terraform import aws_acm_certificate.ssl_cert "$ACM_CERT_ARN"
-
-# Cloudflare records (format: zone_id/record_id)
-terraform import cloudflare_record.root_to_cloudfront "$CF_ZONE_ID/$CF_ROOT_RECORD_ID"
-terraform import cloudflare_record.www_to_cloudfront "$CF_ZONE_ID/$CF_WWW_RECORD_ID"
-terraform import cloudflare_zone_settings_override.ssl_tls_settings "$CF_ZONE_ID"
-
-# ACM validation Cloudflare records — for_each keyed by SAN domain name
-# Find them first:
-#   aws acm describe-certificate --certificate-arn "$ACM_CERT_ARN" --query 'Certificate.DomainValidationOptions'
-# Then per SAN (e.g., "*.protoapp.xyz" and "www.protoapp.xyz"):
-# terraform import 'cloudflare_record.acm_validation["*.protoapp.xyz"]' "$CF_ZONE_ID/<record-id>"
-# terraform import 'cloudflare_record.acm_validation["www.protoapp.xyz"]' "$CF_ZONE_ID/<record-id>"
+aws ecs update-service --cluster ecs-cluster --service launchcamp-api --force-new-deployment
 ```
 
-## 6. Verify — both `terraform plan` should show zero changes
+Tasks will pull the latest task definition, read SSM at boot, and (assuming DB + secrets are right) become healthy.
+
+### 5. Deploy the webapp
+
+The webapp pipeline at `.github/workflows/webapp.yml` still targets protoapp's S3 bucket and env vars. Either:
+- Update the workflow in PR 2 to target `app.launchcamp.xyz-webapp` and the launchcamp env vars, OR
+- Manually deploy once:
 
 ```bash
-cd infra-setup/platform
-terraform plan   # expect: "No changes"
+cd webapp
+npm ci
+VITE_GOOGLE_CLIENT_ID=<launchcamp client id> \
+VITE_GOOGLE_REDIRECT_URL=https://app.launchcamp.xyz/api/auth/google/callback \
+VITE_API_URL=https://app.launchcamp.xyz \
+VITE_STRIPE_PUBLISHABLE_KEY=<pk_live_...> \
+VITE_TURNSTILE_SITE_KEY=<site key> \
+npm run build
 
-cd ../products/protoapp
-terraform plan   # expect: "No changes"
+aws s3 sync ./dist s3://app.launchcamp.xyz-webapp/ --delete
+aws cloudfront create-invalidation \
+  --distribution-id $(terraform -chdir=infra-setup/products/launchcamp output -raw cloudfront_distribution_id) \
+  --paths "/*"
 ```
 
-If platform plan shows destroys, some state rm was missed. Re-run missed removals.
-If protoapp plan shows creates, some import was missed. Re-run missed imports.
-If plan shows modifications, the code doesn't exactly match existing AWS state — compare and adjust code to match what's actually deployed.
+### 6. Smoke test
 
-## 7. (Optional) Clean up orphaned old-path SSM params later
+1. Visit `https://app.launchcamp.xyz` — SPA loads.
+2. Sign up with email; confirm email arrives from Resend.
+3. Log in with Google — OAuth completes.
+4. Hit a Stripe checkout flow — small live charge, refund after.
+5. Tail API logs: `aws logs tail /launchcamp/api --follow`.
+6. Tail Kafka consumer if applicable: tasks publish to `launchcamp.webhook-events` topic.
 
-After migration and after products fully switch to `/platform/rds/*` paths, the old `/db_secrets/protoapp_*` SSM params become redundant. Delete manually with `aws ssm delete-parameter` when convenient.
+## Adding the next product later
 
-## Future: add launchcamp
+Copy `products/launchcamp/` → `products/<newproduct>/`. In the new directory:
 
-`products/launchcamp/` will be its own state (bucket `launchcamp-terraform-state`), created as a copy of `products/protoapp/` with:
-- `variables.tf`: `product = "launchcamp"`, `domain_name = "launchcamp.xyz"`, new `cloudflare_zone_id`
-- SSM paths flattened to `/launchcamp/*` (no legacy compat needed for a fresh product)
-- ALB listener rule priority 100 with `X-Product-Id = "launchcamp"` condition
-- CloudFront distribution with custom origin header `X-Product-Id: launchcamp`
+1. `variables.tf`: change `product`, `domain_name`, `cloudflare_zone_id`, `alb_rule_priority` (must be unique — protoapp=1000, launchcamp=100; pick e.g. 200)
+2. `main.tf`: change backend bucket to `<newproduct>-terraform-state` (create the bucket first)
+3. `terraform init && terraform apply`
+4. Run steps 1–6 above with `<newproduct>` in place of `launchcamp`
 
-When launchcamp is introduced, protoapp's listener rule also needs a small update:
-- Lower priority from 1 to 1000
-- Add `X-Product-Id = "protoapp"` condition
-- Add matching `X-Product-Id: protoapp` custom header to protoapp's CloudFront origin
-
-These are paired changes in `products/protoapp/` (alb-routing.tf + s3-cloudfront.tf) and can go in the launchcamp-adds PR.
+The pattern scales — each product is fully isolated in code and state, and shares only the platform's VPC/RDS/ECS/ALB/Kafka.

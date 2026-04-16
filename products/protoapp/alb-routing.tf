@@ -15,13 +15,13 @@ resource "aws_alb_target_group" "ecs_target" {
   }
 }
 
-# Current protoapp routing: priority 1, path /api/* only. When launchcamp is
-# introduced, this rule's priority drops to 1000 and gains an X-Product-Id
-# condition (paired with a matching custom header on protoapp's CloudFront
-# distribution). Not changed in this PR to keep the state migration a no-op.
+# Protoapp has no X-Product-Id header on its CloudFront, so this rule stays
+# header-less. Priority 1000 (low priority) so per-product rules with header
+# conditions (e.g. launchcamp at 100) match first. Protoapp catches anything
+# without a product-specific header — effectively the default for legacy traffic.
 resource "aws_lb_listener_rule" "alb_listener_rule_api_http" {
   listener_arn = data.terraform_remote_state.platform.outputs.alb_listener_http_arn
-  priority     = 1
+  priority     = 1000
 
   action {
     type             = "forward"
