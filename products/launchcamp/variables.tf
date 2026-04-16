@@ -16,6 +16,18 @@ variable "aws_region" {
   default     = "us-east-1"
 }
 
+variable "display_name" {
+  description = "Human-facing product name (used in the SSM manifest the app repo reads)"
+  type        = string
+  default     = "LaunchCamp"
+}
+
+variable "landing_domain" {
+  description = "Apex domain that serves the marketing landing page"
+  type        = string
+  default     = "launchcamp.xyz"
+}
+
 variable "cloudflare_email" {
   description = "Cloudflare account email"
   type        = string

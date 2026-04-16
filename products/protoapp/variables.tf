@@ -16,6 +16,18 @@ variable "aws_region" {
   default     = "us-east-1"
 }
 
+variable "display_name" {
+  description = "Human-facing product name (used in the SSM manifest the app repo reads)"
+  type        = string
+  default     = "ProtoApp"
+}
+
+variable "landing_domain" {
+  description = "Apex domain serving this product (protoapp has no separate landing — same as app)"
+  type        = string
+  default     = "protoapp.xyz"
+}
+
 variable "cloudflare_email" {
   description = "Cloudflare account email"
   type        = string
