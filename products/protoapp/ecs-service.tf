@@ -27,8 +27,11 @@ resource "aws_ecs_task_definition" "task_definition" {
     {
       name      = var.container_name_api
       image     = "${data.aws_ecr_repository.api.repository_url}:${var.api_image_tag}"
-      cpu       = 256
-      memory    = 256
+      // Go binary sits at ~10 MB RSS and <1% of 1 vCPU under current load; old
+      // cpu=256 / memory=256 was ~150× overprovisioned on both axes.
+      cpu               = 64
+      memoryReservation = 48
+      memory            = 128
       essential = true
 
       portMappings = [

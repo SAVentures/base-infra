@@ -12,8 +12,9 @@ resource "aws_ecs_task_definition" "api" {
     {
       name      = var.container_name_api
       image     = "${aws_ecr_repository.api.repository_url}:${var.api_image_tag}"
-      cpu       = var.api_container_cpu
-      memory    = var.api_container_memory
+      cpu               = var.api_container_cpu
+      memoryReservation = var.api_container_memory_reservation
+      memory            = var.api_container_memory
       essential = true
 
       portMappings = [

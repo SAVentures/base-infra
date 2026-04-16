@@ -25,10 +25,14 @@ resource "aws_ecs_task_definition" "capture_worker" {
 
   container_definitions = jsonencode([
     {
-      name      = var.capture_worker_container_name
-      image     = "${aws_ecr_repository.capture_worker.repository_url}:${var.capture_worker_image_tag}"
-      cpu       = 512
-      memory    = 1024
+      name = var.capture_worker_container_name
+      image = "${aws_ecr_repository.capture_worker.repository_url}:${var.capture_worker_image_tag}"
+      cpu = 512
+      // Soft reservation only — the ECS EC2 node currently has ~620 MB free
+      // after the API service. Setting `memory` (hard limit) to 1024 blocked
+      // scheduling. Playwright + headless Chromium typically sit around
+      // 400-600 MB at idle; this lets it burst above 512 if the node has room.
+      memoryReservation = 512
       essential = true
 
       portMappings = [

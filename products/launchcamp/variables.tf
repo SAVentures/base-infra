@@ -75,16 +75,25 @@ variable "ecr_repository_name" {
   default     = "launchcamp-server"
 }
 
+// Rightsized 2026-04-16: the Go binary sits at ~10 MB RSS and <1% of 1 vCPU
+// under current load; previous defaults (256/256) were ~150x overprovisioned.
+
 variable "api_container_cpu" {
-  description = "CPU units for the API container"
+  description = "CPU shares (weight) for the API container"
   type        = number
-  default     = 256
+  default     = 64
+}
+
+variable "api_container_memory_reservation" {
+  description = "Soft memory reservation (MB) — used for ECS scheduling"
+  type        = number
+  default     = 48
 }
 
 variable "api_container_memory" {
-  description = "Memory (MB) for the API container"
+  description = "Hard memory cap (MB) — container killed if exceeded"
   type        = number
-  default     = 256
+  default     = 128
 }
 
 variable "api_desired_count" {
