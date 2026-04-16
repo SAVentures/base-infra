@@ -45,26 +45,6 @@ data "aws_ssm_parameter" "platform_turnstile_secret_key" {
   name = "/platform/auth/turnstile_secret_key"
 }
 
-data "aws_ssm_parameter" "platform_s3_bucket" {
-  name = "/platform/storage/s3_bucket"
-}
-
-data "aws_ssm_parameter" "platform_s3_region" {
-  name = "/platform/storage/s3_region"
-}
-
-data "aws_ssm_parameter" "platform_s3_access_key_id" {
-  name = "/platform/storage/s3_access_key_id"
-}
-
-data "aws_ssm_parameter" "platform_s3_secret_access_key" {
-  name = "/platform/storage/s3_secret_access_key"
-}
-
-data "aws_ssm_parameter" "platform_media_public_url_base" {
-  name = "/platform/storage/media_public_url_base"
-}
-
 # --- Product-owned (per-product secrets) ---
 
 data "aws_ssm_parameter" "db_name" {

@@ -142,9 +142,41 @@ import {
 
 # The secret was visible only at creation time. Terraform imports the public
 # attributes (id, status, create_date) but `secret` stays unknown. The app
-# doesn't read from TF — it reads from /platform/storage/s3_secret_access_key
-# in SSM, which was populated manually. Re-seed SSM via `aws ssm put-parameter`
-# if the access key is ever rotated.
+# doesn't read from TF — it reads from /protoapp/storage/s3_secret_access_key
+# in SSM (populated from secrets.auto.tfvars). Re-seed the tfvars + apply if
+# the access key is ever rotated.
 resource "aws_iam_access_key" "media_uploader" {
   user = aws_iam_user.media_uploader.name
+}
+
+# ---------- SSM config read by the app at container start ----------
+
+resource "aws_ssm_parameter" "s3_bucket" {
+  name  = "/${var.product}/storage/s3_bucket"
+  type  = "String"
+  value = var.s3_bucket
+}
+
+resource "aws_ssm_parameter" "s3_region" {
+  name  = "/${var.product}/storage/s3_region"
+  type  = "String"
+  value = var.s3_region
+}
+
+resource "aws_ssm_parameter" "s3_access_key_id" {
+  name  = "/${var.product}/storage/s3_access_key_id"
+  type  = "SecureString"
+  value = var.s3_access_key_id
+}
+
+resource "aws_ssm_parameter" "s3_secret_access_key" {
+  name  = "/${var.product}/storage/s3_secret_access_key"
+  type  = "SecureString"
+  value = var.s3_secret_access_key
+}
+
+resource "aws_ssm_parameter" "media_public_url_base" {
+  name  = "/${var.product}/storage/media_public_url_base"
+  type  = "String"
+  value = var.media_public_url_base
 }

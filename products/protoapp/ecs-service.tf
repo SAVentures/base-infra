@@ -88,13 +88,13 @@ resource "aws_ecs_task_definition" "task_definition" {
         { name = "PINTEREST_APP_SECRET", value = data.aws_ssm_parameter.pinterest_app_secret.value },
         { name = "GITHUB_WEBHOOK_SECRET", value = data.aws_ssm_parameter.github_webhook_secret.value },
 
-        # Media storage (shared S3 bucket + IAM user via /platform/storage/*)
+        # Media storage (bucket + IAM user + config all owned by this stack)
         { name = "STORAGE_TYPE", value = data.aws_ssm_parameter.storage_type.value },
-        { name = "S3_BUCKET", value = data.aws_ssm_parameter.platform_s3_bucket.value },
-        { name = "S3_REGION", value = data.aws_ssm_parameter.platform_s3_region.value },
-        { name = "S3_ACCESS_KEY_ID", value = data.aws_ssm_parameter.platform_s3_access_key_id.value },
-        { name = "S3_SECRET_ACCESS_KEY", value = data.aws_ssm_parameter.platform_s3_secret_access_key.value },
-        { name = "MEDIA_PUBLIC_URL_BASE", value = data.aws_ssm_parameter.platform_media_public_url_base.value },
+        { name = "S3_BUCKET", value = aws_ssm_parameter.s3_bucket.value },
+        { name = "S3_REGION", value = aws_ssm_parameter.s3_region.value },
+        { name = "S3_ACCESS_KEY_ID", value = aws_ssm_parameter.s3_access_key_id.value },
+        { name = "S3_SECRET_ACCESS_KEY", value = aws_ssm_parameter.s3_secret_access_key.value },
+        { name = "MEDIA_PUBLIC_URL_BASE", value = aws_ssm_parameter.media_public_url_base.value },
       ]
 
       logConfiguration = {

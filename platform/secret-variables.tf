@@ -35,24 +35,3 @@ variable "turnstile_secret_key" {
   sensitive = true
 }
 
-variable "s3_bucket" {
-  type = string
-}
-
-variable "s3_region" {
-  type = string
-}
-
-variable "s3_access_key_id" {
-  type      = string
-  sensitive = true
-}
-
-variable "s3_secret_access_key" {
-  type      = string
-  sensitive = true
-}
-
-variable "media_public_url_base" {
-  type = string
-}

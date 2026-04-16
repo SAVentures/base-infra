@@ -49,34 +49,5 @@ resource "aws_ssm_parameter" "shared_turnstile_secret_key" {
   value = var.turnstile_secret_key
 }
 
-// --- Media storage (shared S3 bucket + IAM user across products) ---
-
-resource "aws_ssm_parameter" "shared_s3_bucket" {
-  name  = "/platform/storage/s3_bucket"
-  type  = "String"
-  value = var.s3_bucket
-}
-
-resource "aws_ssm_parameter" "shared_s3_region" {
-  name  = "/platform/storage/s3_region"
-  type  = "String"
-  value = var.s3_region
-}
-
-resource "aws_ssm_parameter" "shared_s3_access_key_id" {
-  name  = "/platform/storage/s3_access_key_id"
-  type  = "SecureString"
-  value = var.s3_access_key_id
-}
-
-resource "aws_ssm_parameter" "shared_s3_secret_access_key" {
-  name  = "/platform/storage/s3_secret_access_key"
-  type  = "SecureString"
-  value = var.s3_secret_access_key
-}
-
-resource "aws_ssm_parameter" "shared_media_public_url_base" {
-  name  = "/platform/storage/media_public_url_base"
-  type  = "String"
-  value = var.media_public_url_base
-}
+// Media storage SSM params moved to products/protoapp/media-storage.tf on
+// 2026-04-16 (now at /protoapp/storage/*). Launchcamp doesn't consume them.
