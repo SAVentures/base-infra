@@ -21,14 +21,14 @@ variable "domain_name" {
 
 variable "aws_region" {
   description = "aws region"
-    type        = string
-    default     = "us-east-1"
+  type        = string
+  default     = "us-east-1"
 }
 
 variable "container_name_api" {
-    description = "container name"
-    type        = string
-    default     = "api"
+  description = "container name"
+  type        = string
+  default     = "api"
 }
 
 variable "service_name_api" {
@@ -59,19 +59,19 @@ variable "google_client_secret" {
 
 
 variable "stripe_secret_key" {
-    default = ""
+  default = ""
 }
 
 variable "stripe_webhook_secret" {
-    default = ""
+  default = ""
 }
 
 variable "resend_api_key" {
-    default = ""
+  default = ""
 }
 
 variable "default_email_sender_address" {
-    default = ""
+  default = ""
 }
 
 

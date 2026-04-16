@@ -30,20 +30,20 @@ resource "aws_lb_listener" "http_listener" {
 }
 
 resource "aws_alb_target_group" "ecs_target" {
-    name        = "ecs-target-group"
-    port        = 80
-    protocol    = "HTTP"
-    vpc_id      = aws_vpc.base_vpc.id
+  name     = "ecs-target-group"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = aws_vpc.base_vpc.id
 
-    health_check {
-        path                = "/health"
-        port                = "traffic-port"
-        protocol            = "HTTP"
-        timeout             = 5
-        interval            = 30
-        healthy_threshold   = 5
-        unhealthy_threshold = 2
-    }
+  health_check {
+    path                = "/health"
+    port                = "traffic-port"
+    protocol            = "HTTP"
+    timeout             = 5
+    interval            = 30
+    healthy_threshold   = 5
+    unhealthy_threshold = 2
+  }
 }
 
 # Webapp target group removed - webapp now served via S3/CloudFront

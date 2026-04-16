@@ -8,9 +8,9 @@ resource "aws_efs_file_system" "kafka_data" {
   }
 
   tags = {
-    Name       = "Kafka Data EFS"
-    CreatedBy  = "Terraform"
-    Purpose    = "Kafka persistent storage"
+    Name      = "Kafka Data EFS"
+    CreatedBy = "Terraform"
+    Purpose   = "Kafka persistent storage"
   }
 }
 
@@ -174,8 +174,8 @@ resource "aws_ecs_task_definition" "kafka_task" {
     {
       name      = "kafka"
       image     = "confluentinc/cp-kafka:latest"
-      cpu       = 512   # CPU units (~25% of t3.small)
-      memory    = 768   # Memory in MB (~37.5% of t3.small)
+      cpu       = 512 # CPU units (~25% of t3.small)
+      memory    = 768 # Memory in MB (~37.5% of t3.small)
       essential = true
 
       portMappings = [
