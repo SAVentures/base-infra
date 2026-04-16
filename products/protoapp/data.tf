@@ -11,23 +11,41 @@ data "aws_ecr_repository" "api" {
   name = var.ecr_repository_name
 }
 
-# SSM data sources — read the parameters declared in this stack (secrets.tf)
-# so the task definition pulls their current AWS values.
+# --- Platform-shared (account-wide secrets, single source of truth in /platform/*) ---
 
-data "aws_ssm_parameter" "db_endpoint" {
-  name       = aws_ssm_parameter.db_endpoint.name
-  depends_on = [aws_ssm_parameter.db_endpoint]
+data "aws_ssm_parameter" "rds_endpoint" {
+  name = "/platform/rds/endpoint"
 }
 
-data "aws_ssm_parameter" "db_username" {
-  name       = aws_ssm_parameter.db_username.name
-  depends_on = [aws_ssm_parameter.db_username]
+data "aws_ssm_parameter" "platform_db_username" {
+  name = "/platform/rds/master_username"
 }
 
-data "aws_ssm_parameter" "db_password" {
-  name       = aws_ssm_parameter.db_password.name
-  depends_on = [aws_ssm_parameter.db_password]
+data "aws_ssm_parameter" "platform_db_password" {
+  name = "/platform/rds/master_password"
 }
+
+data "aws_ssm_parameter" "platform_resend_api_key" {
+  name = "/platform/email/resend_api_key"
+}
+
+data "aws_ssm_parameter" "platform_openai_api_key" {
+  name = "/platform/ai/openai_api_key"
+}
+
+data "aws_ssm_parameter" "platform_gemini_api_key" {
+  name = "/platform/ai/gemini_api_key"
+}
+
+data "aws_ssm_parameter" "platform_stripe_secret_key" {
+  name = "/platform/payments/stripe_secret_key"
+}
+
+data "aws_ssm_parameter" "platform_turnstile_secret_key" {
+  name = "/platform/auth/turnstile_secret_key"
+}
+
+# --- Product-owned (per-product secrets) ---
 
 data "aws_ssm_parameter" "db_name" {
   name       = aws_ssm_parameter.db_name.name
@@ -59,37 +77,12 @@ data "aws_ssm_parameter" "web_app_uri" {
   depends_on = [aws_ssm_parameter.web_app_uri]
 }
 
-data "aws_ssm_parameter" "stripe_secret_key" {
-  name       = aws_ssm_parameter.stripe_secret_key.name
-  depends_on = [aws_ssm_parameter.stripe_secret_key]
-}
-
 data "aws_ssm_parameter" "stripe_webhook_secret" {
   name       = aws_ssm_parameter.stripe_webhook_secret.name
   depends_on = [aws_ssm_parameter.stripe_webhook_secret]
 }
 
-data "aws_ssm_parameter" "resend_api_key" {
-  name       = aws_ssm_parameter.resend_api_key.name
-  depends_on = [aws_ssm_parameter.resend_api_key]
-}
-
 data "aws_ssm_parameter" "default_email_sender_address" {
   name       = aws_ssm_parameter.default_email_sender_address.name
   depends_on = [aws_ssm_parameter.default_email_sender_address]
-}
-
-data "aws_ssm_parameter" "gemini_api_key" {
-  name       = aws_ssm_parameter.gemini_api_key.name
-  depends_on = [aws_ssm_parameter.gemini_api_key]
-}
-
-data "aws_ssm_parameter" "openai_api_key" {
-  name       = aws_ssm_parameter.openai_api_key.name
-  depends_on = [aws_ssm_parameter.openai_api_key]
-}
-
-data "aws_ssm_parameter" "turnstile_secret_key" {
-  name       = aws_ssm_parameter.turnstile_secret_key.name
-  depends_on = [aws_ssm_parameter.turnstile_secret_key]
 }

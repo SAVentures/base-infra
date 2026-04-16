@@ -7,19 +7,41 @@ data "terraform_remote_state" "platform" {
   }
 }
 
-data "aws_ssm_parameter" "rds_host" {
-  name = "/platform/rds/host"
+# --- Platform-shared (account-wide secrets, single source of truth in /platform/*) ---
+
+data "aws_ssm_parameter" "platform_db_username" {
+  name = "/platform/rds/master_username"
 }
 
-data "aws_ssm_parameter" "db_username" {
-  name       = aws_ssm_parameter.db_username.name
-  depends_on = [aws_ssm_parameter.db_username]
+data "aws_ssm_parameter" "platform_db_password" {
+  name = "/platform/rds/master_password"
 }
 
-data "aws_ssm_parameter" "db_password" {
-  name       = aws_ssm_parameter.db_password.name
-  depends_on = [aws_ssm_parameter.db_password]
+data "aws_ssm_parameter" "platform_resend_api_key" {
+  name = "/platform/email/resend_api_key"
 }
+
+data "aws_ssm_parameter" "platform_openai_api_key" {
+  name = "/platform/ai/openai_api_key"
+}
+
+data "aws_ssm_parameter" "platform_gemini_api_key" {
+  name = "/platform/ai/gemini_api_key"
+}
+
+data "aws_ssm_parameter" "platform_stripe_secret_key" {
+  name = "/platform/payments/stripe_secret_key"
+}
+
+data "aws_ssm_parameter" "platform_turnstile_secret_key" {
+  name = "/platform/auth/turnstile_secret_key"
+}
+
+data "aws_ssm_parameter" "rds_endpoint" {
+  name = "/platform/rds/endpoint"
+}
+
+# --- Product-owned (per-product secrets) ---
 
 data "aws_ssm_parameter" "jwt_secret" {
   name       = aws_ssm_parameter.jwt_secret.name
@@ -36,37 +58,12 @@ data "aws_ssm_parameter" "google_client_secret" {
   depends_on = [aws_ssm_parameter.google_client_secret]
 }
 
-data "aws_ssm_parameter" "stripe_secret_key" {
-  name       = aws_ssm_parameter.stripe_secret_key.name
-  depends_on = [aws_ssm_parameter.stripe_secret_key]
-}
-
 data "aws_ssm_parameter" "stripe_webhook_secret" {
   name       = aws_ssm_parameter.stripe_webhook_secret.name
   depends_on = [aws_ssm_parameter.stripe_webhook_secret]
 }
 
-data "aws_ssm_parameter" "resend_api_key" {
-  name       = aws_ssm_parameter.resend_api_key.name
-  depends_on = [aws_ssm_parameter.resend_api_key]
-}
-
 data "aws_ssm_parameter" "default_email_sender_address" {
   name       = aws_ssm_parameter.default_email_sender_address.name
   depends_on = [aws_ssm_parameter.default_email_sender_address]
-}
-
-data "aws_ssm_parameter" "gemini_api_key" {
-  name       = aws_ssm_parameter.gemini_api_key.name
-  depends_on = [aws_ssm_parameter.gemini_api_key]
-}
-
-data "aws_ssm_parameter" "openai_api_key" {
-  name       = aws_ssm_parameter.openai_api_key.name
-  depends_on = [aws_ssm_parameter.openai_api_key]
-}
-
-data "aws_ssm_parameter" "turnstile_secret_key" {
-  name       = aws_ssm_parameter.turnstile_secret_key.name
-  depends_on = [aws_ssm_parameter.turnstile_secret_key]
 }
