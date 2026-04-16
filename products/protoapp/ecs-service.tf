@@ -70,6 +70,23 @@ resource "aws_ecs_task_definition" "task_definition" {
         { name = "OPENAI_API_KEY", value = data.aws_ssm_parameter.platform_openai_api_key.value },
         { name = "KAFKA_BROKERS", value = data.terraform_remote_state.platform.outputs.kafka_bootstrap_servers },
         { name = "TURNSTILE_SECRET_KEY", value = data.aws_ssm_parameter.platform_turnstile_secret_key.value },
+
+        # Social platform + integration credentials
+        { name = "OAUTH_REDIRECT_BASE", value = data.aws_ssm_parameter.oauth_redirect_base.value },
+        { name = "X_API_KEY", value = data.aws_ssm_parameter.x_api_key.value },
+        { name = "X_API_SECRET", value = data.aws_ssm_parameter.x_api_secret.value },
+        { name = "LINKEDIN_CLIENT_ID", value = data.aws_ssm_parameter.linkedin_client_id.value },
+        { name = "LINKEDIN_CLIENT_SECRET", value = data.aws_ssm_parameter.linkedin_client_secret.value },
+        { name = "META_APP_ID", value = data.aws_ssm_parameter.meta_app_id.value },
+        { name = "META_APP_SECRET", value = data.aws_ssm_parameter.meta_app_secret.value },
+        { name = "THREADS_APP_ID", value = data.aws_ssm_parameter.threads_app_id.value },
+        { name = "THREADS_APP_SECRET", value = data.aws_ssm_parameter.threads_app_secret.value },
+        { name = "THREADS_ACCESS_TOKEN", value = data.aws_ssm_parameter.threads_access_token.value },
+        { name = "TIKTOK_CLIENT_KEY", value = data.aws_ssm_parameter.tiktok_client_key.value },
+        { name = "TIKTOK_CLIENT_SECRET", value = data.aws_ssm_parameter.tiktok_client_secret.value },
+        { name = "PINTEREST_APP_ID", value = data.aws_ssm_parameter.pinterest_app_id.value },
+        { name = "PINTEREST_APP_SECRET", value = data.aws_ssm_parameter.pinterest_app_secret.value },
+        { name = "GITHUB_WEBHOOK_SECRET", value = data.aws_ssm_parameter.github_webhook_secret.value },
       ]
 
       logConfiguration = {

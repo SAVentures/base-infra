@@ -98,3 +98,111 @@ resource "aws_ssm_parameter" "default_email_sender_address" {
   value = "PLACEHOLDER"
   lifecycle { ignore_changes = [value] }
 }
+
+# --- Social platform + integration credentials (growth-tools) ---
+
+resource "aws_ssm_parameter" "x_api_key" {
+  name  = "/${var.product}/x_api_key"
+  type  = "SecureString"
+  value = "PLACEHOLDER"
+  lifecycle { ignore_changes = [value] }
+}
+
+resource "aws_ssm_parameter" "x_api_secret" {
+  name  = "/${var.product}/x_api_secret"
+  type  = "SecureString"
+  value = "PLACEHOLDER"
+  lifecycle { ignore_changes = [value] }
+}
+
+resource "aws_ssm_parameter" "linkedin_client_id" {
+  name  = "/${var.product}/linkedin_client_id"
+  type  = "String"
+  value = "PLACEHOLDER"
+  lifecycle { ignore_changes = [value] }
+}
+
+resource "aws_ssm_parameter" "linkedin_client_secret" {
+  name  = "/${var.product}/linkedin_client_secret"
+  type  = "SecureString"
+  value = "PLACEHOLDER"
+  lifecycle { ignore_changes = [value] }
+}
+
+resource "aws_ssm_parameter" "meta_app_id" {
+  name  = "/${var.product}/meta_app_id"
+  type  = "String"
+  value = "PLACEHOLDER"
+  lifecycle { ignore_changes = [value] }
+}
+
+resource "aws_ssm_parameter" "meta_app_secret" {
+  name  = "/${var.product}/meta_app_secret"
+  type  = "SecureString"
+  value = "PLACEHOLDER"
+  lifecycle { ignore_changes = [value] }
+}
+
+resource "aws_ssm_parameter" "threads_app_id" {
+  name  = "/${var.product}/threads_app_id"
+  type  = "String"
+  value = "PLACEHOLDER"
+  lifecycle { ignore_changes = [value] }
+}
+
+resource "aws_ssm_parameter" "threads_app_secret" {
+  name  = "/${var.product}/threads_app_secret"
+  type  = "SecureString"
+  value = "PLACEHOLDER"
+  lifecycle { ignore_changes = [value] }
+}
+
+resource "aws_ssm_parameter" "threads_access_token" {
+  name  = "/${var.product}/threads_access_token"
+  type  = "SecureString"
+  value = "PLACEHOLDER"
+  lifecycle { ignore_changes = [value] }
+}
+
+resource "aws_ssm_parameter" "tiktok_client_key" {
+  name  = "/${var.product}/tiktok_client_key"
+  type  = "String"
+  value = "PLACEHOLDER"
+  lifecycle { ignore_changes = [value] }
+}
+
+resource "aws_ssm_parameter" "tiktok_client_secret" {
+  name  = "/${var.product}/tiktok_client_secret"
+  type  = "SecureString"
+  value = "PLACEHOLDER"
+  lifecycle { ignore_changes = [value] }
+}
+
+resource "aws_ssm_parameter" "pinterest_app_id" {
+  name  = "/${var.product}/pinterest_app_id"
+  type  = "String"
+  value = "PLACEHOLDER"
+  lifecycle { ignore_changes = [value] }
+}
+
+resource "aws_ssm_parameter" "pinterest_app_secret" {
+  name  = "/${var.product}/pinterest_app_secret"
+  type  = "SecureString"
+  value = "PLACEHOLDER"
+  lifecycle { ignore_changes = [value] }
+}
+
+resource "aws_ssm_parameter" "github_webhook_secret" {
+  name  = "/${var.product}/github_webhook_secret"
+  type  = "SecureString"
+  value = "PLACEHOLDER"
+  lifecycle { ignore_changes = [value] }
+}
+
+# --- TF-managed: OAuth redirect base used by all social platform OAuth flows ---
+
+resource "aws_ssm_parameter" "oauth_redirect_base" {
+  name  = "/${var.product}/oauth_redirect_base"
+  type  = "String"
+  value = "https://${var.domain_name}"
+}
