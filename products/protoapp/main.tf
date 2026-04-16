@@ -10,11 +10,15 @@ terraform {
       source  = "cloudflare/cloudflare"
       version = "~> 4.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.0"
+    }
   }
 
   backend "s3" {
-    bucket = "launchcamp-terraform-state"
-    key    = "products/launchcamp.tfstate"
+    bucket = "protoapp-terraform-state"
+    key    = "state/terraform.tfstate"
     region = "us-east-1"
   }
 }

@@ -1,4 +1,4 @@
-resource "aws_acm_certificate" "ssl" {
+resource "aws_acm_certificate" "ssl_cert" {
   domain_name               = var.domain_name
   subject_alternative_names = ["*.${var.domain_name}", "www.${var.domain_name}"]
   validation_method         = "DNS"
@@ -10,13 +10,13 @@ resource "aws_acm_certificate" "ssl" {
 
 resource "cloudflare_record" "acm_validation" {
   for_each = {
-    for dvo in aws_acm_certificate.ssl.domain_validation_options :
+    for dvo in aws_acm_certificate.ssl_cert.domain_validation_options :
     dvo.domain_name => {
       name  = dvo.resource_record_name
       type  = dvo.resource_record_type
       value = dvo.resource_record_value
     }
-    if dvo.domain_name != var.domain_name # exclude apex (already present in zone)
+    if dvo.domain_name != var.domain_name
   }
 
   zone_id = var.cloudflare_zone_id
@@ -26,25 +26,25 @@ resource "cloudflare_record" "acm_validation" {
   ttl     = 1
 }
 
-resource "cloudflare_record" "apex" {
+resource "cloudflare_record" "root_to_cloudfront" {
   zone_id = var.cloudflare_zone_id
   name    = "@"
   type    = "CNAME"
-  value   = aws_cloudfront_distribution.webapp.domain_name
+  value   = aws_cloudfront_distribution.webapp_distribution.domain_name
   ttl     = 1
   proxied = false
 }
 
-resource "cloudflare_record" "www" {
+resource "cloudflare_record" "www_to_cloudfront" {
   zone_id = var.cloudflare_zone_id
   name    = "www"
   type    = "CNAME"
-  value   = aws_cloudfront_distribution.webapp.domain_name
+  value   = aws_cloudfront_distribution.webapp_distribution.domain_name
   ttl     = 1
   proxied = false
 }
 
-resource "cloudflare_zone_settings_override" "tls" {
+resource "cloudflare_zone_settings_override" "ssl_tls_settings" {
   zone_id = var.cloudflare_zone_id
 
   settings {

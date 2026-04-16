@@ -1,4 +1,3 @@
-# S3 Bucket for Webapp Static Hosting
 resource "aws_s3_bucket" "webapp_bucket" {
   bucket = "${var.domain_name}-webapp"
 
@@ -8,7 +7,6 @@ resource "aws_s3_bucket" "webapp_bucket" {
   }
 }
 
-# S3 Bucket Public Access Block
 resource "aws_s3_bucket_public_access_block" "webapp_bucket_public_access" {
   bucket = aws_s3_bucket.webapp_bucket.id
 
@@ -18,7 +16,6 @@ resource "aws_s3_bucket_public_access_block" "webapp_bucket_public_access" {
   restrict_public_buckets = true
 }
 
-# S3 Bucket Policy for CloudFront Access
 resource "aws_s3_bucket_policy" "webapp_bucket_policy" {
   bucket = aws_s3_bucket.webapp_bucket.id
 
@@ -43,7 +40,6 @@ resource "aws_s3_bucket_policy" "webapp_bucket_policy" {
   })
 }
 
-# CloudFront Origin Access Control
 resource "aws_cloudfront_origin_access_control" "webapp_oac" {
   name                              = "webapp-oac"
   description                       = "Origin Access Control for Webapp S3 Bucket"
@@ -52,8 +48,6 @@ resource "aws_cloudfront_origin_access_control" "webapp_oac" {
   signing_protocol                  = "sigv4"
 }
 
-# CloudFront Function for SPA routing
-# Rewrites requests to /index.html for client-side routes (excluding /api/* and static assets)
 resource "aws_cloudfront_function" "spa_routing" {
   name    = "spa-routing-function"
   runtime = "cloudfront-js-2.0"
@@ -84,7 +78,6 @@ function handler(event) {
 EOT
 }
 
-# CloudFront Distribution for Webapp
 resource "aws_cloudfront_distribution" "webapp_distribution" {
   enabled             = true
   is_ipv6_enabled     = true
@@ -98,11 +91,8 @@ resource "aws_cloudfront_distribution" "webapp_distribution" {
     origin_access_control_id = aws_cloudfront_origin_access_control.webapp_oac.id
   }
 
-  # API Origin - forward /api/* requests to ALB
-  # Using HTTP since ALB only needs to communicate with CloudFront (not end users)
-  # End-to-end encryption: User -> CloudFront (HTTPS) -> ALB (HTTP) -> ECS (HTTP)
   origin {
-    domain_name = aws_lb.k8s_alb.dns_name
+    domain_name = data.terraform_remote_state.platform.outputs.alb_dns_name
     origin_id   = "ALB-API"
 
     custom_origin_config {
@@ -131,21 +121,18 @@ resource "aws_cloudfront_distribution" "webapp_distribution" {
     max_ttl                = 86400
     compress               = true
 
-    # Attach CloudFront Function for SPA routing
     function_association {
       event_type   = "viewer-request"
       function_arn = aws_cloudfront_function.spa_routing.arn
     }
   }
 
-  # Cache behavior for API requests
   ordered_cache_behavior {
     path_pattern     = "/api/*"
     allowed_methods  = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
     cached_methods   = ["GET", "HEAD"]
     target_origin_id = "ALB-API"
 
-    # Use origin request policy for forwarding headers (modern approach)
     cache_policy_id          = aws_cloudfront_cache_policy.api_cache_policy.id
     origin_request_policy_id = aws_cloudfront_origin_request_policy.api_origin_request_policy.id
 
@@ -171,7 +158,6 @@ resource "aws_cloudfront_distribution" "webapp_distribution" {
   }
 }
 
-# Cache Policy for API - No caching
 resource "aws_cloudfront_cache_policy" "api_cache_policy" {
   name        = "api-no-cache-policy"
   comment     = "No caching for API requests"
@@ -192,8 +178,6 @@ resource "aws_cloudfront_cache_policy" "api_cache_policy" {
   }
 }
 
-# Origin Request Policy for API - Forward viewer headers for real IP detection
-# Note: Authorization header is automatically forwarded and cannot be in the whitelist
 resource "aws_cloudfront_origin_request_policy" "api_origin_request_policy" {
   name    = "api-origin-request-policy"
   comment = "Forward headers needed for API including viewer address, geo, and device info"
@@ -203,15 +187,10 @@ resource "aws_cloudfront_origin_request_policy" "api_origin_request_policy" {
   }
 
   headers_config {
-    # allViewerAndWhitelistCloudFront forwards all viewer headers (Content-Type, Accept, etc.)
-    # PLUS allows whitelisting CloudFront-* headers (up to 10)
-    # Device/OS detection done via User-Agent parsing server-side
     header_behavior = "allViewerAndWhitelistCloudFront"
     headers {
       items = [
-        # Viewer address (IP:port)
         "CloudFront-Viewer-Address",
-        # Geographic data (full coverage)
         "CloudFront-Viewer-Country",
         "CloudFront-Viewer-Country-Region",
         "CloudFront-Viewer-City",
@@ -220,7 +199,6 @@ resource "aws_cloudfront_origin_request_policy" "api_origin_request_policy" {
         "CloudFront-Viewer-Time-Zone",
         "CloudFront-Viewer-Latitude",
         "CloudFront-Viewer-Longitude",
-        # Device detection (mobile is most important, others via User-Agent)
         "CloudFront-Is-Mobile-Viewer",
       ]
     }
@@ -231,7 +209,6 @@ resource "aws_cloudfront_origin_request_policy" "api_origin_request_policy" {
   }
 }
 
-# CloudWatch Log Group for CloudFront (optional)
 resource "aws_cloudwatch_log_group" "cloudfront_logs" {
   name              = "/aws/cloudfront/webapp"
   retention_in_days = 7

@@ -1,0 +1,4 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored.
+
+cloudflare_email   = "you@example.com"
+# cloudflare_zone_id defaults to protoapp.xyz's existing zone id; override if needed

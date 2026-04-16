@@ -11,12 +11,14 @@ data "aws_ecr_repository" "api" {
   name = var.ecr_repository_name
 }
 
-# Platform-owned (DB host comes from shared RDS)
-data "aws_ssm_parameter" "rds_host" {
-  name = "/platform/rds/host"
+# SSM data sources — read the parameters declared in this stack (secrets.tf)
+# so the task definition pulls their current AWS values.
+
+data "aws_ssm_parameter" "db_endpoint" {
+  name       = aws_ssm_parameter.db_endpoint.name
+  depends_on = [aws_ssm_parameter.db_endpoint]
 }
 
-# Product-owned. These are declared in secrets.tf; user populates values in SSM.
 data "aws_ssm_parameter" "db_username" {
   name       = aws_ssm_parameter.db_username.name
   depends_on = [aws_ssm_parameter.db_username]
@@ -25,6 +27,11 @@ data "aws_ssm_parameter" "db_username" {
 data "aws_ssm_parameter" "db_password" {
   name       = aws_ssm_parameter.db_password.name
   depends_on = [aws_ssm_parameter.db_password]
+}
+
+data "aws_ssm_parameter" "db_name" {
+  name       = aws_ssm_parameter.db_name.name
+  depends_on = [aws_ssm_parameter.db_name]
 }
 
 data "aws_ssm_parameter" "jwt_secret" {
@@ -42,6 +49,16 @@ data "aws_ssm_parameter" "google_client_secret" {
   depends_on = [aws_ssm_parameter.google_client_secret]
 }
 
+data "aws_ssm_parameter" "google_redirect_uri" {
+  name       = aws_ssm_parameter.google_redirect_uri.name
+  depends_on = [aws_ssm_parameter.google_redirect_uri]
+}
+
+data "aws_ssm_parameter" "web_app_uri" {
+  name       = aws_ssm_parameter.web_app_uri.name
+  depends_on = [aws_ssm_parameter.web_app_uri]
+}
+
 data "aws_ssm_parameter" "stripe_secret_key" {
   name       = aws_ssm_parameter.stripe_secret_key.name
   depends_on = [aws_ssm_parameter.stripe_secret_key]
@@ -57,6 +74,11 @@ data "aws_ssm_parameter" "resend_api_key" {
   depends_on = [aws_ssm_parameter.resend_api_key]
 }
 
+data "aws_ssm_parameter" "default_email_sender_address" {
+  name       = aws_ssm_parameter.default_email_sender_address.name
+  depends_on = [aws_ssm_parameter.default_email_sender_address]
+}
+
 data "aws_ssm_parameter" "gemini_api_key" {
   name       = aws_ssm_parameter.gemini_api_key.name
   depends_on = [aws_ssm_parameter.gemini_api_key]
@@ -70,9 +92,4 @@ data "aws_ssm_parameter" "openai_api_key" {
 data "aws_ssm_parameter" "turnstile_secret_key" {
   name       = aws_ssm_parameter.turnstile_secret_key.name
   depends_on = [aws_ssm_parameter.turnstile_secret_key]
-}
-
-data "aws_ssm_parameter" "default_email_sender_address" {
-  name       = aws_ssm_parameter.default_email_sender_address.name
-  depends_on = [aws_ssm_parameter.default_email_sender_address]
 }

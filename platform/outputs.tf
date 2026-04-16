@@ -57,20 +57,3 @@ output "kafka_bootstrap_servers" {
   value       = "kafka.base-services.local:9092"
   description = "Internal Kafka endpoint (shared)"
 }
-
-# --- Legacy protoapp-only outputs (retained so protoapp stack stays consistent; ignore for new products) ---
-
-output "cloudfront_distribution_id" {
-  value       = aws_cloudfront_distribution.webapp_distribution.id
-  description = "CloudFront distribution ID for the legacy protoapp webapp"
-}
-
-output "cloudfront_domain_name" {
-  value       = aws_cloudfront_distribution.webapp_distribution.domain_name
-  description = "CloudFront domain name for the legacy protoapp webapp"
-}
-
-output "webapp_s3_bucket" {
-  value       = aws_s3_bucket.webapp_bucket.id
-  description = "S3 bucket for the legacy protoapp webapp"
-}
