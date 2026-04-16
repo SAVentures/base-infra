@@ -8,27 +8,32 @@ resource "aws_acm_certificate" "ssl_cert" {
   }
 }
 
-resource "cloudflare_record" "acm_validation" {
-  for_each = {
-    for dvo in aws_acm_certificate.ssl_cert.domain_validation_options :
-    dvo.domain_name => {
+locals {
+  acm_validation_sans = toset(["*.${var.domain_name}", "www.${var.domain_name}"])
+  acm_validation_by_domain = {
+    for dvo in aws_acm_certificate.ssl_cert.domain_validation_options : dvo.domain_name => {
       name  = dvo.resource_record_name
       type  = dvo.resource_record_type
       value = dvo.resource_record_value
     }
-    if dvo.domain_name != var.domain_name
   }
+}
+
+resource "cloudflare_record" "acm_validation" {
+  for_each = local.acm_validation_sans
 
   zone_id = var.cloudflare_zone_id
-  name    = trimsuffix(each.value.name, ".")
-  type    = each.value.type
-  value   = each.value.value
-  ttl     = 1
+  # Cloudflare stores record names as the subdomain only (zone stripped).
+  # AWS ACM gives the FQDN with trailing dot — strip both.
+  name  = replace(trimsuffix(local.acm_validation_by_domain[each.key].name, "."), ".${var.domain_name}", "")
+  type  = local.acm_validation_by_domain[each.key].type
+  value = local.acm_validation_by_domain[each.key].value
+  ttl   = 1
 }
 
 resource "cloudflare_record" "root_to_cloudfront" {
   zone_id = var.cloudflare_zone_id
-  name    = "@"
+  name    = var.domain_name
   type    = "CNAME"
   value   = aws_cloudfront_distribution.webapp_distribution.domain_name
   ttl     = 1
