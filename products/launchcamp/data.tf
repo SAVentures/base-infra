@@ -7,10 +7,6 @@ data "terraform_remote_state" "platform" {
   }
 }
 
-data "aws_ecr_repository" "api" {
-  name = var.ecr_repository_name
-}
-
 data "aws_ssm_parameter" "rds_host" {
   name = "/platform/rds/host"
 }

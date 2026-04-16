@@ -58,9 +58,9 @@ variable "api_image_tag" {
 }
 
 variable "ecr_repository_name" {
-  description = "ECR repository holding the API image"
+  description = "ECR repository name for this product's API image (Terraform-managed; see ecr.tf)"
   type        = string
-  default     = "base-server"
+  default     = "launchcamp-server"
 }
 
 variable "api_container_cpu" {

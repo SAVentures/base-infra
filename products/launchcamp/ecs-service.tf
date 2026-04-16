@@ -11,7 +11,7 @@ resource "aws_ecs_task_definition" "api" {
   container_definitions = jsonencode([
     {
       name      = var.container_name_api
-      image     = "${data.aws_ecr_repository.api.repository_url}:${var.api_image_tag}"
+      image     = "${aws_ecr_repository.api.repository_url}:${var.api_image_tag}"
       cpu       = var.api_container_cpu
       memory    = var.api_container_memory
       essential = true
