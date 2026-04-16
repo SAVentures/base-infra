@@ -68,3 +68,27 @@ variable "ecr_repository_name" {
   type        = string
   default     = "base-server"
 }
+
+variable "capture_worker_ecr_repository" {
+  description = "ECR repository holding the capture-worker image"
+  type        = string
+  default     = "protoapp-capture-worker"
+}
+
+variable "capture_worker_service_name" {
+  description = "ECS service name for the capture-worker"
+  type        = string
+  default     = "capture_worker_service"
+}
+
+variable "capture_worker_container_name" {
+  description = "Container name in the capture-worker task definition"
+  type        = string
+  default     = "capture-worker"
+}
+
+variable "capture_worker_image_tag" {
+  description = "ECR image tag to deploy for the capture-worker"
+  type        = string
+  default     = "latest"
+}

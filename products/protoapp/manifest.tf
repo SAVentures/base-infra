@@ -12,12 +12,14 @@ resource "aws_ssm_parameter" "manifest" {
       landing = var.landing_domain
     }
     aws = {
-      region                   = var.aws_region
-      ecrRepository            = data.aws_ecr_repository.api.name
-      ecsCluster               = data.terraform_remote_state.platform.outputs.ecs_cluster_name
-      ecsService               = aws_ecs_service.ecs_service.name
-      webappS3Bucket           = aws_s3_bucket.webapp_bucket.id
-      cloudfrontDistributionId = aws_cloudfront_distribution.webapp_distribution.id
+      region                      = var.aws_region
+      ecrRepository               = data.aws_ecr_repository.api.name
+      ecsCluster                  = data.terraform_remote_state.platform.outputs.ecs_cluster_name
+      ecsService                  = aws_ecs_service.ecs_service.name
+      webappS3Bucket              = aws_s3_bucket.webapp_bucket.id
+      cloudfrontDistributionId    = aws_cloudfront_distribution.webapp_distribution.id
+      captureWorkerEcrRepository  = aws_ecr_repository.capture_worker.name
+      captureWorkerEcsService     = aws_ecs_service.capture_worker.name
     }
     ssm = {
       productPrefix  = "/${var.product}"

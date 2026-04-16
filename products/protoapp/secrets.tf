@@ -192,3 +192,23 @@ resource "aws_ssm_parameter" "github_webhook_secret" {
   type  = "SecureString"
   value = var.github_webhook_secret
 }
+
+// --- Capture worker ---
+
+resource "aws_ssm_parameter" "capture_worker_shared_secret" {
+  name  = "/${var.product}/capture_worker/shared_secret"
+  type  = "SecureString"
+  value = var.capture_worker_shared_secret
+}
+
+resource "aws_ssm_parameter" "capture_worker_demo_email" {
+  name  = "/${var.product}/capture_worker/demo_email"
+  type  = "String"
+  value = var.capture_worker_demo_email
+}
+
+resource "aws_ssm_parameter" "capture_worker_demo_password" {
+  name  = "/${var.product}/capture_worker/demo_password"
+  type  = "SecureString"
+  value = var.capture_worker_demo_password
+}

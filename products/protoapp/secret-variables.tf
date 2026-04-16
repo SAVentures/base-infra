@@ -115,3 +115,22 @@ variable "s3_secret_access_key" {
 variable "media_public_url_base" {
   type = string
 }
+
+// --- Capture worker ---
+
+variable "capture_worker_shared_secret" {
+  description = "Shared secret required on every request to the capture-worker via X-Capture-Secret header"
+  type        = string
+  sensitive   = true
+}
+
+variable "capture_worker_demo_email" {
+  description = "Email of the seeded test-login user the capture-worker authenticates as"
+  type        = string
+}
+
+variable "capture_worker_demo_password" {
+  description = "Password of the seeded test-login user the capture-worker authenticates as"
+  type        = string
+  sensitive   = true
+}
