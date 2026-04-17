@@ -79,11 +79,43 @@ resource "aws_ecs_task_definition" "capture_worker" {
   ])
 }
 
-// ---------- Target group + listener rule ----------
+// ---------- Private exposure (internal ALB) ----------
 //
-// Public path (/internal/capture/*) on the shared ALB. The service itself
-// requires the X-Capture-Secret header for auth, so raw path exposure is fine.
-// Base-server calls this as https://protoapp.xyz/internal/capture/capture.
+// Capture-worker is reached only from inside the VPC (base-server container
+// talks to it via the internal ALB's DNS name). The service still authenticates
+// inbound requests with X-Capture-Secret as defense-in-depth, but the network
+// boundary now keeps it off the public internet.
+
+resource "aws_security_group" "capture_worker_alb" {
+  name        = "capture-worker-internal-alb-sg"
+  description = "Allow port 80 from inside the VPC only"
+  vpc_id      = data.terraform_remote_state.platform.outputs.vpc_id
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.0.0/16"] // VPC CIDR — base-server is the only caller
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_lb" "capture_worker_internal" {
+  name               = "capture-worker-internal"
+  internal           = true
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.capture_worker_alb.id]
+  subnets = [
+    data.terraform_remote_state.platform.outputs.private_subnet_ids[0],
+    data.terraform_remote_state.platform.outputs.private_subnet_ids[1],
+  ]
+}
 
 resource "aws_alb_target_group" "capture_worker" {
   name     = "capture-worker-tg"
@@ -103,19 +135,14 @@ resource "aws_alb_target_group" "capture_worker" {
   }
 }
 
-resource "aws_lb_listener_rule" "capture_worker_http" {
-  listener_arn = data.terraform_remote_state.platform.outputs.alb_listener_http_arn
-  priority     = 500
+resource "aws_lb_listener" "capture_worker_internal_http" {
+  load_balancer_arn = aws_lb.capture_worker_internal.arn
+  port              = 80
+  protocol          = "HTTP"
 
-  action {
+  default_action {
     type             = "forward"
     target_group_arn = aws_alb_target_group.capture_worker.arn
-  }
-
-  condition {
-    path_pattern {
-      values = ["/internal/capture/*"]
-    }
   }
 }
 
@@ -135,5 +162,5 @@ resource "aws_ecs_service" "capture_worker" {
     target_group_arn = aws_alb_target_group.capture_worker.arn
   }
 
-  depends_on = [aws_lb_listener_rule.capture_worker_http]
+  depends_on = [aws_lb_listener.capture_worker_internal_http]
 }
