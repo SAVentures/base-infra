@@ -90,6 +90,8 @@ resource "aws_ecs_task_definition" "task_definition" {
         { name = "PINTEREST_APP_ID", value = data.aws_ssm_parameter.pinterest_app_id.value },
         { name = "PINTEREST_APP_SECRET", value = data.aws_ssm_parameter.pinterest_app_secret.value },
         { name = "GITHUB_WEBHOOK_SECRET", value = data.aws_ssm_parameter.github_webhook_secret.value },
+        { name = "GITHUB_OAUTH_CLIENT_ID", value = aws_ssm_parameter.github_oauth_client_id.value },
+        { name = "GITHUB_OAUTH_CLIENT_SECRET", value = aws_ssm_parameter.github_oauth_client_secret.value },
 
         # Media storage (bucket + IAM user + config all owned by this stack)
         { name = "STORAGE_TYPE", value = data.aws_ssm_parameter.storage_type.value },

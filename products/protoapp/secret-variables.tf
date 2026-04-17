@@ -134,3 +134,16 @@ variable "capture_worker_demo_password" {
   type        = string
   sensitive   = true
 }
+
+// --- GitHub OAuth App ---
+
+variable "github_oauth_client_id" {
+  description = "Client ID of the GitHub OAuth App used for the Repos connection flow"
+  type        = string
+}
+
+variable "github_oauth_client_secret" {
+  description = "Client secret of the GitHub OAuth App"
+  type        = string
+  sensitive   = true
+}

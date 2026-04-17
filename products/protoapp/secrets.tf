@@ -212,3 +212,17 @@ resource "aws_ssm_parameter" "capture_worker_demo_password" {
   type  = "SecureString"
   value = var.capture_worker_demo_password
 }
+
+// --- GitHub OAuth App ---
+
+resource "aws_ssm_parameter" "github_oauth_client_id" {
+  name  = "/${var.product}/github_oauth_client_id"
+  type  = "String"
+  value = var.github_oauth_client_id
+}
+
+resource "aws_ssm_parameter" "github_oauth_client_secret" {
+  name  = "/${var.product}/github_oauth_client_secret"
+  type  = "SecureString"
+  value = var.github_oauth_client_secret
+}
