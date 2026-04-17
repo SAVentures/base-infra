@@ -100,11 +100,6 @@ resource "aws_ecs_task_definition" "task_definition" {
         { name = "S3_ACCESS_KEY_ID", value = aws_ssm_parameter.s3_access_key_id.value },
         { name = "S3_SECRET_ACCESS_KEY", value = aws_ssm_parameter.s3_secret_access_key.value },
         { name = "MEDIA_PUBLIC_URL_BASE", value = aws_ssm_parameter.media_public_url_base.value },
-
-        # Capture-worker (reached over the VPC-internal ALB only — not exposed
-        # publicly). Shared secret still required as defense-in-depth.
-        { name = "CAPTURE_WORKER_URL", value = "http://${aws_lb.capture_worker_internal.dns_name}" },
-        { name = "CAPTURE_WORKER_SHARED_SECRET", value = aws_ssm_parameter.capture_worker_shared_secret.value },
       ]
 
       logConfiguration = {
