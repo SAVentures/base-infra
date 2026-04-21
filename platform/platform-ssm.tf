@@ -16,6 +16,12 @@ resource "aws_ssm_parameter" "platform_rds_endpoint" {
   value = aws_db_instance.default.endpoint
 }
 
+resource "aws_ssm_parameter" "platform_rds_port" {
+  name  = "/platform/rds/port"
+  type  = "String"
+  value = aws_db_instance.default.port
+}
+
 resource "aws_ssm_parameter" "platform_rds_master_username" {
   name  = "/platform/rds/master_username"
   type  = "SecureString"

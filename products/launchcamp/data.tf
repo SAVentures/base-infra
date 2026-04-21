@@ -37,8 +37,12 @@ data "aws_ssm_parameter" "platform_turnstile_secret_key" {
   name = "/platform/auth/turnstile_secret_key"
 }
 
-data "aws_ssm_parameter" "rds_endpoint" {
-  name = "/platform/rds/endpoint"
+data "aws_ssm_parameter" "rds_host" {
+  name = "/platform/rds/host"
+}
+
+data "aws_ssm_parameter" "rds_port" {
+  name = "/platform/rds/port"
 }
 
 # --- Product-owned (per-product secrets) ---

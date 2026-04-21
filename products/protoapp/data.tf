@@ -13,8 +13,12 @@ data "aws_ecr_repository" "api" {
 
 # --- Platform-shared (account-wide secrets, single source of truth in /platform/*) ---
 
-data "aws_ssm_parameter" "rds_endpoint" {
-  name = "/platform/rds/endpoint"
+data "aws_ssm_parameter" "rds_host" {
+  name = "/platform/rds/host"
+}
+
+data "aws_ssm_parameter" "rds_port" {
+  name = "/platform/rds/port"
 }
 
 data "aws_ssm_parameter" "platform_db_username" {

@@ -55,10 +55,11 @@ resource "aws_ecs_task_definition" "task_definition" {
       environment = [
         { name = "GO_ENV", value = var.environment },
         { name = "GIN_MODE", value = "release" },
-        { name = "DB_HOST", value = data.aws_ssm_parameter.rds_endpoint.value },
+        { name = "DB_HOST", value = data.aws_ssm_parameter.rds_host.value },
         { name = "DB_USERNAME", value = data.aws_ssm_parameter.platform_db_username.value },
         { name = "DB_PASSWORD", value = data.aws_ssm_parameter.platform_db_password.value },
         { name = "DB_NAME", value = data.aws_ssm_parameter.db_name.value },
+        { name = "DB_PORT", value = data.aws_ssm_parameter.rds_port.value },
         { name = "JWT_SECRET", value = data.aws_ssm_parameter.jwt_secret.value },
         { name = "GOOGLE_CLIENT_ID", value = data.aws_ssm_parameter.google_client_id.value },
         { name = "GOOGLE_CLIENT_SECRET", value = data.aws_ssm_parameter.google_client_secret.value },
@@ -73,6 +74,7 @@ resource "aws_ecs_task_definition" "task_definition" {
         { name = "OPENAI_API_KEY", value = data.aws_ssm_parameter.platform_openai_api_key.value },
         { name = "KAFKA_BROKERS", value = data.terraform_remote_state.platform.outputs.kafka_bootstrap_servers },
         { name = "TURNSTILE_SECRET_KEY", value = data.aws_ssm_parameter.platform_turnstile_secret_key.value },
+        { name = "PRODUCT_NAME", value = var.product },
 
         # Social platform + integration credentials
         { name = "OAUTH_REDIRECT_BASE", value = data.aws_ssm_parameter.oauth_redirect_base.value },
