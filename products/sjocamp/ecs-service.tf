@@ -10,12 +10,12 @@ resource "aws_ecs_task_definition" "api" {
 
   container_definitions = jsonencode([
     {
-      name      = var.container_name_api
-      image     = "${aws_ecr_repository.api.repository_url}:${var.api_image_tag}"
+      name              = var.container_name_api
+      image             = "${aws_ecr_repository.api.repository_url}:${var.api_image_tag}"
       cpu               = var.api_container_cpu
       memoryReservation = var.api_container_memory_reservation
       memory            = var.api_container_memory
-      essential = true
+      essential         = true
 
       portMappings = [
         { containerPort = 80, hostPort = 0 }
@@ -45,6 +45,7 @@ resource "aws_ecs_task_definition" "api" {
         { name = "WEBAPP_URI", value = aws_ssm_parameter.web_app_uri.value },
         { name = "STRIPE_SECRET_KEY", value = data.aws_ssm_parameter.platform_stripe_secret_key.value },
         { name = "STRIPE_WEBHOOK_SECRET", value = data.aws_ssm_parameter.stripe_webhook_secret.value },
+        { name = "STRIPE_BILLING_PORTAL_CONFIG_ID", value = aws_ssm_parameter.stripe_billing_portal_config_id.value },
         { name = "RESEND_API_KEY", value = data.aws_ssm_parameter.platform_resend_api_key.value },
         { name = "RESEND_WEBHOOK_SECRET", value = data.aws_ssm_parameter.resend_webhook_secret.value },
         { name = "DEFAULT_EMAIL_SENDER_ADDRESS", value = data.aws_ssm_parameter.default_email_sender_address.value },

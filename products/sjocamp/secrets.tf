@@ -53,6 +53,12 @@ resource "aws_ssm_parameter" "stripe_webhook_secret" {
   value = var.stripe_webhook_secret
 }
 
+resource "aws_ssm_parameter" "stripe_billing_portal_config_id" {
+  name  = "/${var.product}/stripe_billing_portal_config_id"
+  type  = "String"
+  value = var.stripe_billing_portal_config_id
+}
+
 resource "aws_ssm_parameter" "resend_webhook_secret" {
   name  = "/${var.product}/resend_webhook_secret"
   type  = "SecureString"

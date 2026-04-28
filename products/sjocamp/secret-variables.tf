@@ -21,6 +21,11 @@ variable "stripe_webhook_secret" {
   sensitive = true
 }
 
+variable "stripe_billing_portal_config_id" {
+  type        = string
+  description = "Stripe Billing Portal configuration ID (bpc_*). Mode-specific — must be a live-mode config in production."
+}
+
 variable "resend_webhook_secret" {
   type      = string
   sensitive = true
