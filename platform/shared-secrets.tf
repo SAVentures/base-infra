@@ -50,4 +50,4 @@ resource "aws_ssm_parameter" "shared_turnstile_secret_key" {
 }
 
 // Media storage SSM params moved to products/protoapp/media-storage.tf on
-// 2026-04-16 (now at /protoapp/storage/*). Launchcamp doesn't consume them.
+// 2026-04-16 (now at /protoapp/storage/*). Sjocamp doesn't consume them.

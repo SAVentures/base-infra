@@ -1,4 +1,4 @@
-# See products/launchcamp/manifest.tf for the pattern + rationale.
+# See products/sjocamp/manifest.tf for the pattern + rationale.
 
 resource "aws_ssm_parameter" "manifest" {
   name = "/${var.product}/manifest"

@@ -14,12 +14,16 @@ resource "aws_lb_target_group" "api" {
     healthy_threshold   = 5
     unhealthy_threshold = 2
   }
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
-# Routes /api/* requests carrying the X-Product-Id=launchcamp header (injected
-# by launchcamp's CloudFront distribution) to launchcamp's target group.
+# Routes /api/* requests carrying the X-Product-Id=sjocamp header (injected
+# by sjocamp's CloudFront distribution) to sjocamp's target group.
 # Priority 100; protoapp's catch-all rule sits at priority 1000 so it picks up
-# any non-launchcamp /api/* traffic.
+# any non-sjocamp /api/* traffic.
 resource "aws_lb_listener_rule" "api" {
   listener_arn = data.terraform_remote_state.platform.outputs.alb_listener_http_arn
   priority     = var.alb_rule_priority

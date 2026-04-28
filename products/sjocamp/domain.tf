@@ -25,8 +25,8 @@ resource "cloudflare_dns_record" "acm_validation" {
   ttl     = 1
 }
 
-# Single CNAME for app.launchcamp.xyz pointing at this product's CloudFront.
-# The apex (launchcamp.xyz) and www are managed elsewhere (landing site on
+# Single CNAME for app.sjocamp.co pointing at this product's CloudFront.
+# The apex (sjocamp.co) and www are managed elsewhere (landing site on
 # Cloudflare Pages) — Terraform here intentionally does not touch them.
 resource "cloudflare_dns_record" "app_to_cloudfront" {
   zone_id = var.cloudflare_zone_id
