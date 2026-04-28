@@ -67,6 +67,11 @@ data "aws_ssm_parameter" "stripe_webhook_secret" {
   depends_on = [aws_ssm_parameter.stripe_webhook_secret]
 }
 
+data "aws_ssm_parameter" "resend_webhook_secret" {
+  name       = aws_ssm_parameter.resend_webhook_secret.name
+  depends_on = [aws_ssm_parameter.resend_webhook_secret]
+}
+
 data "aws_ssm_parameter" "default_email_sender_address" {
   name       = aws_ssm_parameter.default_email_sender_address.name
   depends_on = [aws_ssm_parameter.default_email_sender_address]

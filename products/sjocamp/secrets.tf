@@ -53,6 +53,12 @@ resource "aws_ssm_parameter" "stripe_webhook_secret" {
   value = var.stripe_webhook_secret
 }
 
+resource "aws_ssm_parameter" "resend_webhook_secret" {
+  name  = "/${var.product}/resend_webhook_secret"
+  type  = "SecureString"
+  value = var.resend_webhook_secret
+}
+
 resource "aws_ssm_parameter" "default_email_sender_address" {
   name  = "/${var.product}/default_email_sender_address"
   type  = "String"

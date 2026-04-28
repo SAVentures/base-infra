@@ -46,6 +46,7 @@ resource "aws_ecs_task_definition" "api" {
         { name = "STRIPE_SECRET_KEY", value = data.aws_ssm_parameter.platform_stripe_secret_key.value },
         { name = "STRIPE_WEBHOOK_SECRET", value = data.aws_ssm_parameter.stripe_webhook_secret.value },
         { name = "RESEND_API_KEY", value = data.aws_ssm_parameter.platform_resend_api_key.value },
+        { name = "RESEND_WEBHOOK_SECRET", value = data.aws_ssm_parameter.resend_webhook_secret.value },
         { name = "DEFAULT_EMAIL_SENDER_ADDRESS", value = data.aws_ssm_parameter.default_email_sender_address.value },
         { name = "GOOGLE_AI_API_KEY", value = data.aws_ssm_parameter.platform_gemini_api_key.value },
         { name = "OPENAI_API_KEY", value = data.aws_ssm_parameter.platform_openai_api_key.value },

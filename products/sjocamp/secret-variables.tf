@@ -21,6 +21,11 @@ variable "stripe_webhook_secret" {
   sensitive = true
 }
 
+variable "resend_webhook_secret" {
+  type      = string
+  sensitive = true
+}
+
 variable "default_email_sender_address" {
   type = string
 }
