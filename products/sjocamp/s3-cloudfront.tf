@@ -60,6 +60,10 @@ function handler(event) {
     return request;
 }
 EOT
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_cloudfront_cache_policy" "api_cache_policy" {

@@ -1,4 +1,4 @@
-// Per-product SSM for launchcamp.
+// Per-product SSM for sjocamp.
 //
 // Secret values are supplied by Terraform variables sourced from a gitignored
 // `secrets.auto.tfvars`. Rotate by editing that file and running

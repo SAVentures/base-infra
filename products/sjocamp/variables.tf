@@ -1,13 +1,13 @@
 variable "product" {
   description = "Product identifier (used in resource names and SSM paths)"
   type        = string
-  default     = "launchcamp"
+  default     = "sjocamp"
 }
 
 variable "domain_name" {
   description = "Domain served by this product (app subdomain — landing site lives at the apex)"
   type        = string
-  default     = "app.launchcamp.xyz"
+  default     = "app.sjocamp.co"
 }
 
 variable "aws_region" {
@@ -19,13 +19,13 @@ variable "aws_region" {
 variable "display_name" {
   description = "Human-facing product name (used in the SSM manifest the app repo reads)"
   type        = string
-  default     = "LaunchCamp"
+  default     = "Sjocamp"
 }
 
 variable "landing_domain" {
   description = "Apex domain that serves the marketing landing page"
   type        = string
-  default     = "launchcamp.xyz"
+  default     = "sjocamp.co"
 }
 
 variable "cloudflare_email" {
@@ -34,9 +34,9 @@ variable "cloudflare_email" {
 }
 
 variable "cloudflare_zone_id" {
-  description = "Cloudflare zone ID for launchcamp.xyz"
+  description = "Cloudflare zone ID for sjocamp.co"
   type        = string
-  default     = "d0acb7396dd4c732ff6fd1ccc5e514f6"
+  default     = "858e1079c9f3cfa804a258e78b2f02ed"
 }
 
 variable "environment" {
@@ -60,7 +60,7 @@ variable "container_name_api" {
 variable "service_name_api" {
   description = "ECS service name"
   type        = string
-  default     = "launchcamp-api"
+  default     = "sjocamp-api"
 }
 
 variable "api_image_tag" {
@@ -72,7 +72,7 @@ variable "api_image_tag" {
 variable "ecr_repository_name" {
   description = "ECR repository name for this product's API image (Terraform-managed; see ecr.tf)"
   type        = string
-  default     = "launchcamp-server"
+  default     = "sjocamp-server"
 }
 
 // Rightsized 2026-04-16: the Go binary sits at ~10 MB RSS and <1% of 1 vCPU

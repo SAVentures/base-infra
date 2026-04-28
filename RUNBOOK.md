@@ -4,15 +4,15 @@ Two stacks in this PR are now applied to AWS:
 
 - `platform/` — shared VPC, RDS, ECS cluster, ALB, Kafka. State at `s3://protoapp-infra-terraform-state/state/terraform.tfstate`.
 - `products/protoapp/` — protoapp.xyz live, ECS service, CloudFront, S3, SSM. State at `s3://protoapp-terraform-state/state/terraform.tfstate`.
-- `products/launchcamp/` — `app.launchcamp.xyz` SaaS, CloudFront, S3, ECS service `launchcamp-api`, SSM. State at `s3://launchcamp-terraform-state/state/terraform.tfstate`.
+- `products/sjocamp/` — `app.sjocamp.co` SaaS, CloudFront, S3, ECS service `sjocamp-api`, SSM. State at `s3://sjocamp-terraform-state/state/terraform.tfstate`.
 
-The launchcamp landing page (apex `launchcamp.xyz` and `www.launchcamp.xyz`) is intentionally not managed here — it lives on Cloudflare Pages and is untouched.
+The sjocamp landing page (apex `sjocamp.co` and `www.sjocamp.co`) is intentionally not managed here — it lives on Cloudflare Pages and is untouched.
 
 ## Routing model on the shared ALB
 
 | Priority | Match | Target |
 |---|---|---|
-| 100 | path `/api/*` AND header `X-Product-Id=launchcamp` | launchcamp target group |
+| 100 | path `/api/*` AND header `X-Product-Id=sjocamp` | sjocamp target group |
 | 1000 | path `/api/*` (no header) | protoapp target group |
 | default | (any /\* not matched above) | 404 |
 
@@ -22,14 +22,14 @@ Each product's CloudFront origin injects the `X-Product-Id` header so the ALB ca
 
 - Migrated all protoapp-specific resources from the original single-stack into `products/protoapp/` via `terraform state rm` + `terraform import` (zero recreation).
 - Upgraded Cloudflare provider to v5 in `products/protoapp/` (cloudflare_record → cloudflare_dns_record, value → content, cloudflare_zone_settings_override → 5x cloudflare_zone_setting).
-- Lowered protoapp's ALB listener rule priority from 1 → 1000 to make room for launchcamp at priority 100.
-- Created `products/launchcamp/` with state in new bucket `launchcamp-terraform-state`. Applied: ACM cert (validated), Cloudflare DNS for `app.launchcamp.xyz`, S3 bucket `app.launchcamp.xyz-webapp`, CloudFront distribution, ECS service `launchcamp-api`, ALB target group + listener rule, 14 SSM placeholders.
+- Lowered protoapp's ALB listener rule priority from 1 → 1000 to make room for sjocamp at priority 100.
+- Created `products/sjocamp/` with state in new bucket `sjocamp-terraform-state`. Applied: ACM cert (validated), Cloudflare DNS for `app.sjocamp.co`, S3 bucket `app.sjocamp.co-webapp`, CloudFront distribution, ECS service `sjocamp-api`, ALB target group + listener rule, 14 SSM placeholders.
 
-## What's left to make launchcamp actually serve traffic
+## What's left to make sjocamp actually serve traffic
 
-The ECS service `launchcamp-api` is deployed but tasks are unhealthy until the database exists and SSM secrets hold real values.
+The ECS service `sjocamp-api` is deployed but tasks are unhealthy until the database exists and SSM secrets hold real values.
 
-### 1. Create the launchcamp database on shared RDS
+### 1. Create the sjocamp database on shared RDS
 
 ```bash
 INSTANCE_ID=$(aws ec2 describe-instances \
@@ -52,45 +52,45 @@ Then in another terminal:
 LAUNCHCAMP_APP_PASS=$(openssl rand -base64 24 | tr -d '/+=' | head -c 24)
 
 PGPASSWORD="$RDS_MASTER_PASS" psql -h localhost -p 15432 -U "$RDS_MASTER_USER" -d postgres <<EOF
-CREATE DATABASE launchcamp;
-CREATE USER launchcamp_app WITH PASSWORD '$LAUNCHCAMP_APP_PASS';
-GRANT ALL PRIVILEGES ON DATABASE launchcamp TO launchcamp_app;
+CREATE DATABASE sjocamp;
+CREATE USER sjocamp_app WITH PASSWORD '$LAUNCHCAMP_APP_PASS';
+GRANT ALL PRIVILEGES ON DATABASE sjocamp TO sjocamp_app;
 EOF
 
-aws ssm put-parameter --name /launchcamp/db_username --type SecureString --value launchcamp_app --overwrite
-aws ssm put-parameter --name /launchcamp/db_password --type SecureString --value "$LAUNCHCAMP_APP_PASS" --overwrite
+aws ssm put-parameter --name /sjocamp/db_username --type SecureString --value sjocamp_app --overwrite
+aws ssm put-parameter --name /sjocamp/db_password --type SecureString --value "$LAUNCHCAMP_APP_PASS" --overwrite
 ```
 
 Stop the port-forward when done. Run Flyway migrations from the base-server repo against this new DB.
 
-### 2. Register external services for launchcamp
+### 2. Register external services for sjocamp
 
-- **Google Cloud Console**: new OAuth client. Authorized redirect URI: `https://app.launchcamp.xyz/api/auth/google/callback`. Capture client_id + client_secret.
-- **Stripe**: live-mode keys. Webhook endpoint: `https://app.launchcamp.xyz/api/webhooks/stripe` (path may differ — match your handler). Capture publishable_key + secret_key + webhook signing secret.
-- **Resend**: verify `launchcamp.xyz` as a sending domain (DKIM + SPF TXT records on the apex zone). Reuse existing API key or generate a new one.
-- **Turnstile**: new site for `app.launchcamp.xyz`. Capture site_key + secret.
+- **Google Cloud Console**: new OAuth client. Authorized redirect URI: `https://app.sjocamp.co/api/auth/google/callback`. Capture client_id + client_secret.
+- **Stripe**: live-mode keys. Webhook endpoint: `https://app.sjocamp.co/api/webhooks/stripe` (path may differ — match your handler). Capture publishable_key + secret_key + webhook signing secret.
+- **Resend**: verify `sjocamp.co` as a sending domain (DKIM + SPF TXT records on the apex zone). Reuse existing API key or generate a new one.
+- **Turnstile**: new site for `app.sjocamp.co`. Capture site_key + secret.
 
-### 3. Populate launchcamp SSM params
+### 3. Populate sjocamp SSM params
 
 ```bash
-aws ssm put-parameter --name /launchcamp/jwt_secret --type SecureString --value "$(openssl rand -hex 32)" --overwrite
-aws ssm put-parameter --name /launchcamp/google_client_id --type String --value "<id>" --overwrite
-aws ssm put-parameter --name /launchcamp/google_client_secret --type SecureString --value "<secret>" --overwrite
-aws ssm put-parameter --name /launchcamp/stripe_publishable_key --type String --value "<pk_live_...>" --overwrite
-aws ssm put-parameter --name /launchcamp/stripe_secret_key --type SecureString --value "<sk_live_...>" --overwrite
-aws ssm put-parameter --name /launchcamp/stripe_webhook_secret --type SecureString --value "<whsec_...>" --overwrite
-aws ssm put-parameter --name /launchcamp/resend_api_key --type SecureString --value "<re_...>" --overwrite
-aws ssm put-parameter --name /launchcamp/default_email_sender_address --type String --value "no-reply@launchcamp.xyz" --overwrite
-aws ssm put-parameter --name /launchcamp/gemini_api_key --type SecureString --value "<key>" --overwrite
-aws ssm put-parameter --name /launchcamp/openai_api_key --type SecureString --value "<key>" --overwrite
-aws ssm put-parameter --name /launchcamp/turnstile_site_key --type String --value "<site key>" --overwrite
-aws ssm put-parameter --name /launchcamp/turnstile_secret_key --type SecureString --value "<secret>" --overwrite
+aws ssm put-parameter --name /sjocamp/jwt_secret --type SecureString --value "$(openssl rand -hex 32)" --overwrite
+aws ssm put-parameter --name /sjocamp/google_client_id --type String --value "<id>" --overwrite
+aws ssm put-parameter --name /sjocamp/google_client_secret --type SecureString --value "<secret>" --overwrite
+aws ssm put-parameter --name /sjocamp/stripe_publishable_key --type String --value "<pk_live_...>" --overwrite
+aws ssm put-parameter --name /sjocamp/stripe_secret_key --type SecureString --value "<sk_live_...>" --overwrite
+aws ssm put-parameter --name /sjocamp/stripe_webhook_secret --type SecureString --value "<whsec_...>" --overwrite
+aws ssm put-parameter --name /sjocamp/resend_api_key --type SecureString --value "<re_...>" --overwrite
+aws ssm put-parameter --name /sjocamp/default_email_sender_address --type String --value "no-reply@sjocamp.co" --overwrite
+aws ssm put-parameter --name /sjocamp/gemini_api_key --type SecureString --value "<key>" --overwrite
+aws ssm put-parameter --name /sjocamp/openai_api_key --type SecureString --value "<key>" --overwrite
+aws ssm put-parameter --name /sjocamp/turnstile_site_key --type String --value "<site key>" --overwrite
+aws ssm put-parameter --name /sjocamp/turnstile_secret_key --type SecureString --value "<secret>" --overwrite
 ```
 
 ### 4. Force a new ECS deployment so tasks pick up the new env
 
 ```bash
-aws ecs update-service --cluster ecs-cluster --service launchcamp-api --force-new-deployment
+aws ecs update-service --cluster ecs-cluster --service sjocamp-api --force-new-deployment
 ```
 
 Tasks will pull the latest task definition, read SSM at boot, and (assuming DB + secrets are right) become healthy.
@@ -98,41 +98,41 @@ Tasks will pull the latest task definition, read SSM at boot, and (assuming DB +
 ### 5. Deploy the webapp
 
 The webapp pipeline at `.github/workflows/webapp.yml` still targets protoapp's S3 bucket and env vars. Either:
-- Update the workflow in PR 2 to target `app.launchcamp.xyz-webapp` and the launchcamp env vars, OR
+- Update the workflow in PR 2 to target `app.sjocamp.co-webapp` and the sjocamp env vars, OR
 - Manually deploy once:
 
 ```bash
 cd webapp
 npm ci
-VITE_GOOGLE_CLIENT_ID=<launchcamp client id> \
-VITE_GOOGLE_REDIRECT_URL=https://app.launchcamp.xyz/api/auth/google/callback \
-VITE_API_URL=https://app.launchcamp.xyz \
+VITE_GOOGLE_CLIENT_ID=<sjocamp client id> \
+VITE_GOOGLE_REDIRECT_URL=https://app.sjocamp.co/api/auth/google/callback \
+VITE_API_URL=https://app.sjocamp.co \
 VITE_STRIPE_PUBLISHABLE_KEY=<pk_live_...> \
 VITE_TURNSTILE_SITE_KEY=<site key> \
 npm run build
 
-aws s3 sync ./dist s3://app.launchcamp.xyz-webapp/ --delete
+aws s3 sync ./dist s3://app.sjocamp.co-webapp/ --delete
 aws cloudfront create-invalidation \
-  --distribution-id $(terraform -chdir=infra-setup/products/launchcamp output -raw cloudfront_distribution_id) \
+  --distribution-id $(terraform -chdir=infra-setup/products/sjocamp output -raw cloudfront_distribution_id) \
   --paths "/*"
 ```
 
 ### 6. Smoke test
 
-1. Visit `https://app.launchcamp.xyz` — SPA loads.
+1. Visit `https://app.sjocamp.co` — SPA loads.
 2. Sign up with email; confirm email arrives from Resend.
 3. Log in with Google — OAuth completes.
 4. Hit a Stripe checkout flow — small live charge, refund after.
-5. Tail API logs: `aws logs tail /launchcamp/api --follow`.
-6. Tail Kafka consumer if applicable: tasks publish to `launchcamp.webhook-events` topic.
+5. Tail API logs: `aws logs tail /sjocamp/api --follow`.
+6. Tail Kafka consumer if applicable: tasks publish to `sjocamp.webhook-events` topic.
 
 ## Adding the next product later
 
-Copy `products/launchcamp/` → `products/<newproduct>/`. In the new directory:
+Copy `products/sjocamp/` → `products/<newproduct>/`. In the new directory:
 
-1. `variables.tf`: change `product`, `domain_name`, `cloudflare_zone_id`, `alb_rule_priority` (must be unique — protoapp=1000, launchcamp=100; pick e.g. 200)
+1. `variables.tf`: change `product`, `domain_name`, `cloudflare_zone_id`, `alb_rule_priority` (must be unique — protoapp=1000, sjocamp=100; pick e.g. 200)
 2. `main.tf`: change backend bucket to `<newproduct>-terraform-state` (create the bucket first)
 3. `terraform init && terraform apply`
-4. Run steps 1–6 above with `<newproduct>` in place of `launchcamp`
+4. Run steps 1–6 above with `<newproduct>` in place of `sjocamp`
 
 The pattern scales — each product is fully isolated in code and state, and shares only the platform's VPC/RDS/ECS/ALB/Kafka.
