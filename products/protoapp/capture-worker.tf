@@ -23,17 +23,23 @@ resource "aws_ecs_task_definition" "capture_worker" {
   execution_role_arn = data.terraform_remote_state.platform.outputs.ecs_task_role_arn
   network_mode       = "bridge"
 
+  # Hosts are Graviton (t4g) — image is built linux/arm64 in CI.
+  runtime_platform {
+    cpu_architecture        = "ARM64"
+    operating_system_family = "LINUX"
+  }
+
   container_definitions = jsonencode([
     {
-      name = var.capture_worker_container_name
+      name  = var.capture_worker_container_name
       image = "${aws_ecr_repository.capture_worker.repository_url}:${var.capture_worker_image_tag}"
-      cpu = 512
+      cpu   = 512
       // Soft reservation only — the ECS EC2 node currently has ~620 MB free
       // after the API service. Setting `memory` (hard limit) to 1024 blocked
       // scheduling. Playwright + headless Chromium typically sit around
       // 400-600 MB at idle; this lets it burst above 512 if the node has room.
       memoryReservation = 512
-      essential = true
+      essential         = true
 
       portMappings = [
         {

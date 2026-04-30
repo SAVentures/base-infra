@@ -156,6 +156,12 @@ resource "aws_ecs_task_definition" "kafka_task" {
   network_mode             = "awsvpc"
   requires_compatibilities = ["EC2"]
 
+  # Hosts are Graviton (t4g) — task scheduler must place this on an arm64 node.
+  runtime_platform {
+    cpu_architecture        = "ARM64"
+    operating_system_family = "LINUX"
+  }
+
   # EFS Volume for Kafka Data Persistence
   volume {
     name = "kafka-data"
@@ -174,8 +180,8 @@ resource "aws_ecs_task_definition" "kafka_task" {
     {
       name      = "kafka"
       image     = "confluentinc/cp-kafka:latest"
-      cpu       = 512 # CPU units (~25% of t3.small)
-      memory    = 768 # Memory in MB (~37.5% of t3.small)
+      cpu       = 512  # CPU units (~25% of t4g.large)
+      memory    = 2048 # Memory in MB (~26% of t4g.large) — Confluent's default JVM heap is 1 GB; 768 MB OOMKilled the container on first start. 2 GB leaves headroom for off-heap + page cache.
       essential = true
 
       portMappings = [

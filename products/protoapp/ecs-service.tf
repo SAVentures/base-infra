@@ -23,16 +23,22 @@ resource "aws_ecs_task_definition" "task_definition" {
   execution_role_arn = data.terraform_remote_state.platform.outputs.ecs_task_role_arn
   network_mode       = "bridge"
 
+  # Hosts are Graviton (t4g) — image is built linux/arm64 in CI.
+  runtime_platform {
+    cpu_architecture        = "ARM64"
+    operating_system_family = "LINUX"
+  }
+
   container_definitions = jsonencode([
     {
-      name      = var.container_name_api
-      image     = "${data.aws_ecr_repository.api.repository_url}:${var.api_image_tag}"
+      name  = var.container_name_api
+      image = "${data.aws_ecr_repository.api.repository_url}:${var.api_image_tag}"
       // Go binary sits at ~10 MB RSS and <1% of 1 vCPU under current load; old
       // cpu=256 / memory=256 was ~150× overprovisioned on both axes.
       cpu               = 64
       memoryReservation = 48
       memory            = 128
-      essential = true
+      essential         = true
 
       portMappings = [
         {

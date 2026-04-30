@@ -66,14 +66,21 @@ resource "aws_iam_role_policy_attachment" "ssm_policy_attachment" {
   role       = aws_iam_role.ec2_role.name # Attach to EC2 role
 }
 
+# Latest ECS-optimized Amazon Linux 2023 AMI for arm64 (Graviton). AWS publishes
+# the recommended image id via SSM, so we resolve it at apply time instead of
+# hardcoding — guarantees we never accidentally pin an x86 AMI on an arm host.
+data "aws_ssm_parameter" "ecs_optimized_arm64_ami" {
+  name = "/aws/service/ecs/optimized-ami/amazon-linux-2023/arm64/recommended/image_id"
+}
+
 # Launch Configuration for AutoScaling Group
 # Defines the EC2 launch configuration for ECS instances with SSM support.
 resource "aws_launch_configuration" "app_launch_config_with_ssm" {
-  name_prefix          = "app-launch-config-with-ssm-"                      # Use name_prefix instead of name for create_before_destroy
-  image_id             = "ami-0af9e559c6749eb48"                            # Amazon Machine Image (AMI)
-  instance_type        = "t3.small"                                         # Instance type (2GB RAM, ~$15/month)
-  security_groups      = [aws_security_group.web_dmz.id]                    # Security group for the instances
-  iam_instance_profile = aws_iam_instance_profile.ecs_instance_profile.name # Instance profile for EC2
+  name_prefix          = "app-launch-config-with-ssm-"                        # Use name_prefix instead of name for create_before_destroy
+  image_id             = data.aws_ssm_parameter.ecs_optimized_arm64_ami.value # ECS-optimized AL2023 (arm64)
+  instance_type        = "t4g.large"                                          # Graviton (2 vCPU, 8 GB, ~$49/month)
+  security_groups      = [aws_security_group.web_dmz.id]                      # Security group for the instances
+  iam_instance_profile = aws_iam_instance_profile.ecs_instance_profile.name   # Instance profile for EC2
   # User data to set ECS cluster
   user_data = <<-EOF
     #!/bin/bash
