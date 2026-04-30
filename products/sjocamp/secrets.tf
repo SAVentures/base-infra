@@ -70,3 +70,21 @@ resource "aws_ssm_parameter" "default_email_sender_address" {
   type  = "String"
   value = var.default_email_sender_address
 }
+
+// --- Sentry (webapp runtime error reporting) ---
+//
+// DSN is technically public (embedded in the client bundle at build time) but
+// stored in SSM so the same TF source of truth governs it. Auth token is the
+// CI credential that uploads sourcemaps during build — secret.
+
+resource "aws_ssm_parameter" "sentry_webapp_dsn" {
+  name  = "/${var.product}/sentry/webapp_dsn"
+  type  = "String"
+  value = var.sentry_webapp_dsn
+}
+
+resource "aws_ssm_parameter" "sentry_auth_token" {
+  name  = "/${var.product}/sentry/auth_token"
+  type  = "SecureString"
+  value = var.sentry_auth_token
+}

@@ -27,5 +27,9 @@ resource "aws_ssm_parameter" "manifest" {
       productPrefix  = "/${var.product}"
       platformPrefix = "/platform"
     }
+    sentry = {
+      org           = var.sentry_org
+      webappProject = var.sentry_webapp_project
+    }
   })
 }

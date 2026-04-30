@@ -34,3 +34,14 @@ variable "resend_webhook_secret" {
 variable "default_email_sender_address" {
   type = string
 }
+
+variable "sentry_webapp_dsn" {
+  type        = string
+  description = "Sentry DSN for the webapp project. Public (embedded in the client bundle) but managed in SSM for parity with other build-time config."
+}
+
+variable "sentry_auth_token" {
+  type        = string
+  sensitive   = true
+  description = "Sentry CI auth token used by the webapp build to upload sourcemaps. Needs scopes: project:releases, project:write."
+}

@@ -96,6 +96,16 @@ variable "api_container_memory" {
   default     = 128
 }
 
+variable "sentry_org" {
+  description = "Sentry organisation slug (used by the webapp build to upload sourcemaps)."
+  type        = string
+}
+
+variable "sentry_webapp_project" {
+  description = "Sentry project slug for the webapp."
+  type        = string
+}
+
 variable "api_desired_count" {
   description = "Number of API tasks to run"
   type        = number
