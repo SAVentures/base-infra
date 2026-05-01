@@ -305,6 +305,15 @@ resource "aws_ecs_service" "kafka_service" {
   launch_type     = "EC2"
   task_definition = aws_ecs_task_definition.kafka_task.arn
 
+  # Stop-then-start: kafka holds an exclusive lock on its EFS data dir + KRaft
+  # metadata, so two replicas cannot coexist even briefly. The default
+  # max=200/min=100 tries to start a new task alongside the old one during
+  # rolling deploys, which deadlocks (new task starts, fails to acquire the
+  # log-dir lock, exits clean). Forcing max=100/min=0 makes ECS drain the
+  # old task before scheduling the new one.
+  deployment_minimum_healthy_percent = 0
+  deployment_maximum_percent         = 100
+
   network_configuration {
     subnets         = [aws_subnet.public_subnet_a.id]
     security_groups = [aws_security_group.kafka_service.id]
