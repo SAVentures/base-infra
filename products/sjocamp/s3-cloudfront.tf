@@ -167,7 +167,7 @@ resource "aws_cloudfront_distribution" "webapp_distribution" {
 
     function_association {
       event_type   = "viewer-request"
-      function_arn = aws_cloudfront_function.spa_routing.arn
+      function_arn = data.terraform_remote_state.platform.outputs.cloudfront_spa_function_arn
     }
   }
 
@@ -176,8 +176,8 @@ resource "aws_cloudfront_distribution" "webapp_distribution" {
     allowed_methods          = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
     cached_methods           = ["GET", "HEAD"]
     target_origin_id         = "ALB-${var.product}"
-    cache_policy_id          = aws_cloudfront_cache_policy.api_cache_policy.id
-    origin_request_policy_id = aws_cloudfront_origin_request_policy.api_origin_request_policy.id
+    cache_policy_id          = data.terraform_remote_state.platform.outputs.cloudfront_api_cache_policy_id
+    origin_request_policy_id = data.terraform_remote_state.platform.outputs.cloudfront_api_origin_request_policy_id
     viewer_protocol_policy   = "redirect-to-https"
     compress                 = true
   }
