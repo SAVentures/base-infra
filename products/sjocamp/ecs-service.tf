@@ -1,6 +1,6 @@
 resource "aws_cloudwatch_log_group" "api" {
   name              = "/${var.product}/api"
-  retention_in_days = 7
+  retention_in_days = module.product.log_retention_days
 }
 
 resource "aws_ecs_task_definition" "api" {

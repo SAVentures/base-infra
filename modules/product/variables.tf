@@ -119,10 +119,17 @@ variable "log_group_name" {
   default     = null
 }
 
+variable "log_retention_days" {
+  description = "Override log retention. Defaults by tier: prototype 7, product 90."
+  type        = number
+  default     = null
+}
+
 locals {
   s3_bucket_name     = coalesce(var.s3_bucket_name, "protoapp-${var.product}-webapp")
   target_group_name  = coalesce(var.target_group_name, "${var.product}-api-tg")
   oac_name           = coalesce(var.oac_name, "${var.product}-webapp-oac")
   log_group_name     = coalesce(var.log_group_name, "/aws/cloudfront/${var.product}-webapp")
   cloudfront_aliases = concat([var.domain], var.extra_aliases)
+  log_retention_days = coalesce(var.log_retention_days, var.tier == "product" ? 90 : 7)
 }

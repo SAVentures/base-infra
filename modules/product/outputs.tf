@@ -22,3 +22,8 @@ output "listener_rule_arn" {
   value       = aws_lb_listener_rule.api.arn
   description = "For ECS services that must depend_on the rule existing"
 }
+
+output "log_retention_days" {
+  value       = local.log_retention_days
+  description = "Tier-resolved retention. Product stacks apply this to their own ECS log groups so the tier governs all of a product's logs."
+}

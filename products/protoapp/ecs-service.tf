@@ -1,6 +1,6 @@
 resource "aws_cloudwatch_log_group" "ecs_log_group" {
   name              = "${var.container_name_api}-logs"
-  retention_in_days = 7
+  retention_in_days = module.product.log_retention_days
 }
 
 resource "aws_ecs_service" "ecs_service" {
