@@ -14,7 +14,14 @@ resource "aws_cloudwatch_metric_alarm" "no_healthy_hosts" {
   threshold           = 1
   period              = 60
   evaluation_periods  = 2
-  treat_missing_data  = "notBreaching"
+
+  # breaching, not notBreaching: CloudWatch stops emitting HealthyHostCount
+  # entirely once the target group has zero registered targets — that is
+  # every task down, the exact outage this alarm exists to catch. Missing
+  # data here means "nothing is registered," not "nothing happened." This is
+  # the opposite of target_5xx below, whose metric is genuinely absent during
+  # a quiet period.
+  treat_missing_data = "breaching"
 
   alarm_actions = [var.alerts_topic_arn]
   ok_actions    = [var.alerts_topic_arn]

@@ -448,7 +448,14 @@ resource "aws_cloudwatch_metric_alarm" "no_healthy_hosts" {
   threshold           = 1
   period              = 60
   evaluation_periods  = 2
-  treat_missing_data  = "notBreaching"
+
+  # breaching, not notBreaching: CloudWatch stops emitting HealthyHostCount
+  # entirely once the target group has zero registered targets — that is
+  # every task down, the exact outage this alarm exists to catch. Missing
+  # data here means "nothing is registered," not "nothing happened." This is
+  # the opposite of target_5xx below, whose metric is genuinely absent during
+  # a quiet period.
+  treat_missing_data = "breaching"
 
   alarm_actions = [var.alerts_topic_arn]
   ok_actions    = [var.alerts_topic_arn]
@@ -482,7 +489,10 @@ resource "aws_cloudwatch_metric_alarm" "target_5xx" {
 }
 ```
 
-`treat_missing_data = "notBreaching"` matters: these metrics are only emitted when there is traffic, and a quiet period must not read as an outage.
+The two alarms treat missing data **differently**, and the asymmetry is the point:
+
+- `target_5xx` uses `notBreaching`. `HTTPCode_Target_5XX_Count` is only emitted when there is traffic, so a quiet period must not read as an outage.
+- `no_healthy_hosts` uses `breaching`. `HealthyHostCount` stops being emitted entirely once the target group has **zero registered targets** — every task down, which is precisely the outage this alarm exists to catch. Treating that as "not breaching" would make the alarm silent during the worst-case failure.
 
 - [ ] **Step 3: Wire the sjocamp call site**
 
@@ -541,9 +551,11 @@ git add modules/product/variables.tf modules/product/alarms.tf \
         products/sjocamp/main.tf products/protoapp/main.tf
 git commit -m "feat(product): add target-group alarms for products only
 
-Unhealthy hosts and target 5xx, both count=0 for prototypes — a broken
-prototype must not page anyone. treat_missing_data=notBreaching so a quiet
-period does not read as an outage."
+No-healthy-hosts and target 5xx, both count=0 for prototypes — a broken
+prototype must not page anyone. target_5xx uses notBreaching so a quiet
+period does not read as an outage; no_healthy_hosts uses breaching because
+a missing HealthyHostCount means zero registered targets, which IS the
+outage."
 ```
 
 ---

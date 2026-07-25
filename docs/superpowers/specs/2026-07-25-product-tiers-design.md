@@ -189,10 +189,10 @@ retention.
 Two alarms on the target group the module already owns, both
 `count = var.tier == "product" ? 1 : 0`:
 
-| Alarm | Metric | Condition |
-|---|---|---|
-| No healthy hosts | `AWS/ApplicationELB` `HealthyHostCount` | `< 1` for 2 consecutive periods |
-| Target 5xx | `AWS/ApplicationELB` `HTTPCode_Target_5XX_Count` | `> 10` over 5 minutes |
+| Alarm | Metric | Condition | Missing data |
+|---|---|---|---|
+| No healthy hosts | `AWS/ApplicationELB` `HealthyHostCount` | `< 1` for 2 consecutive periods | `breaching` — the metric goes missing when the target group has zero registered targets, which is the outage itself |
+| Target 5xx | `AWS/ApplicationELB` `HTTPCode_Target_5XX_Count` | `> 10` over 5 minutes | `notBreaching` — the metric is genuinely absent during a quiet period |
 
 Both require `TargetGroup` and `LoadBalancer` dimensions, hence the new
 `platform_alb_arn_suffix` input.
