@@ -72,7 +72,6 @@ platform/                      # + cloudflare provider
 modules/product/               # extracted from products/sjocamp
   cloudfront.tf                # S3 + OAC + distribution + aliases
   alb-routing.tf               # target group + X-Product-Id listener rule
-  ecs-service.tf               # task definition + service
   domain.tf                    # Cloudflare DNS record for the subdomain
   manifest.tf                  # SSM /{product}/manifest
   variables.tf outputs.tf
@@ -92,6 +91,16 @@ eliminates the entire name-collision class.
 
 The capture worker stays in `products/meerkat/`. It has one consumer; a
 `count`-gated block in a shared module would be speculative generality.
+
+**The ECS task definition and service also stay per-product.** Their
+`environment` blocks are irreducibly product-specific — sjocamp injects Stripe
+billing-portal and Resend webhook values, meerkat injects eight social-platform
+credential pairs. Sharing them would require threading a large env-var map
+through the module, which is worse than the duplication it removes. The module
+instead owns the target group and outputs its ARN; each product defines its own
+task definition and service and wires them to `module.product.target_group_arn`.
+The module boundary is therefore *edge and routing* — S3, CloudFront, DNS,
+target group, listener rule, manifest — not compute.
 
 ## Module interface
 
