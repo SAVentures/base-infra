@@ -20,8 +20,8 @@ resource "aws_ssm_parameter" "manifest" {
       ecrRepository            = aws_ecr_repository.api.name
       ecsCluster               = data.terraform_remote_state.platform.outputs.ecs_cluster_name
       ecsService               = aws_ecs_service.api.name
-      webappS3Bucket           = aws_s3_bucket.webapp_bucket.id
-      cloudfrontDistributionId = aws_cloudfront_distribution.webapp_distribution.id
+      webappS3Bucket           = module.product.webapp_bucket_id
+      cloudfrontDistributionId = module.product.cloudfront_distribution_id
     }
     ssm = {
       productPrefix  = "/${var.product}"

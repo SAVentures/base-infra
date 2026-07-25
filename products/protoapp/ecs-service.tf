@@ -14,8 +14,10 @@ resource "aws_ecs_service" "ecs_service" {
   load_balancer {
     container_name   = var.container_name_api
     container_port   = 80
-    target_group_arn = aws_alb_target_group.ecs_target.arn
+    target_group_arn = module.product.target_group_arn
   }
+
+  depends_on = [module.product]
 }
 
 resource "aws_ecs_task_definition" "task_definition" {

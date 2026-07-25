@@ -1,6 +1,6 @@
 # Webapp Deployment Guide
 
-The webapp is a static Vite app served by S3 + CloudFront (per product), with `/api/*` forwarded to the shared ALB.
+The webapp is a static Vite app served by S3 + CloudFront (per product, provisioned by `modules/product`), with `/api/*` forwarded to the shared ALB.
 
 ## Architecture
 
@@ -25,21 +25,22 @@ VITE_TURNSTILE_SITE_KEY=<sjocamp turnstile site key>
 
 ## Deploy commands
 
+Read ids from the product's SSM manifest rather than hardcoding them — that is
+what the manifest exists for.
+
 ```bash
-cd webapp
-npm ci
-# (env vars as above)
-npm run build
+PRODUCT=protoapp   # or sjocamp
+MANIFEST=$(aws ssm get-parameter --name "/$PRODUCT/manifest" --query 'Parameter.Value' --output text)
+BUCKET=$(echo "$MANIFEST" | jq -r '.aws.webappS3Bucket')
+DIST=$(echo "$MANIFEST" | jq -r '.aws.cloudfrontDistributionId')
 
-aws s3 sync ./dist s3://sjocamp.co-webapp/ --delete
-aws cloudfront create-invalidation --distribution-id <cloudfront-id> --paths "/*"
+aws s3 sync ./dist "s3://$BUCKET/" --delete
+aws cloudfront create-invalidation --distribution-id "$DIST" --paths "/*"
 ```
-
-`<cloudfront-id>` comes from `terraform -chdir=../infra-setup/products/sjocamp output -raw cloudfront_distribution_id`.
 
 ## CI/CD
 
-The workflow at `.github/workflows/webapp.yml` handles push-to-main builds. It currently has protoapp values hardcoded (legacy). PR 2 will parameterize it to target sjocamp.
+The workflow at `.github/workflows/webapp.yml` handles push-to-main builds. It still has protoapp values hardcoded (legacy) and should be reworked to read the SSM manifest as shown above.
 
 ## SPA routing
 

@@ -57,3 +57,33 @@ output "kafka_bootstrap_servers" {
   value       = "kafka.base-services.local:9092"
   description = "Internal Kafka endpoint (shared)"
 }
+
+output "cloudfront_api_cache_policy_id" {
+  value       = aws_cloudfront_cache_policy.api_no_cache.id
+  description = "Shared no-cache policy for /api/* behaviours"
+}
+
+output "cloudfront_api_origin_request_policy_id" {
+  value       = aws_cloudfront_origin_request_policy.api_origin_request.id
+  description = "Shared origin-request policy forwarding viewer headers to the API"
+}
+
+output "cloudfront_spa_function_arn" {
+  value       = aws_cloudfront_function.spa_routing.arn
+  description = "Shared viewer-request function rewriting SPA routes to index.html"
+}
+
+output "acm_certificate_arn" {
+  value       = aws_acm_certificate.wildcard.arn
+  description = "Wildcard cert covering protoapp.xyz and *.protoapp.xyz; used by every product CloudFront"
+}
+
+output "cloudflare_zone_id" {
+  value       = var.cloudflare_zone_id
+  description = "Cloudflare zone ID for the umbrella zone"
+}
+
+output "zone_domain" {
+  value       = var.zone_domain
+  description = "Umbrella domain hosting all product subdomains"
+}

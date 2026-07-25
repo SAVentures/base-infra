@@ -28,16 +28,42 @@ Routing (once multiple products exist): each product's CloudFront forwards `/api
 
 See [RUNBOOK.md](./RUNBOOK.md) for the protoapp state migration — how to move existing resources from the pre-split state into platform + products/protoapp without recreating anything.
 
-## Adding a new product (future)
+## Adding a new project
 
-1. `cp -r products/protoapp products/<newproduct>` as a starting template
-2. Edit `products/<newproduct>/variables.tf`: set `product`, `domain_name`, `cloudflare_zone_id`
-3. Edit `products/<newproduct>/main.tf`: change backend to a new bucket (`<newproduct>-terraform-state`)
-4. Change SSM paths in `secrets.tf` to `/<newproduct>/*` (new product, no legacy path compat needed)
-5. Add listener rule condition `X-Product-Id = "<newproduct>"` with a unique priority
-6. Add matching custom origin header on the product's CloudFront
-7. `terraform init && terraform apply`
-8. Create the product's DB + user on shared RDS; populate `/<newproduct>/*` SSM
+Every project is a subdomain of `protoapp.xyz`: a static SPA on S3 + CloudFront
+with `/api/*` forwarded to the shared ALB.
+
+1. `cp -r products/_template products/<slug>` and replace every `PROJECT_SLUG`
+2. Pick an unused `alb_rule_priority` — sjocamp 100, protoapp 200, new projects
+   from 300 in steps of 10. AWS rejects duplicate priorities.
+3. `aws s3 mb s3://<slug>-terraform-state`
+4. Add the project's ECS task definition and service in `products/<slug>/`,
+   wiring `load_balancer.target_group_arn` to `module.product.target_group_arn`
+5. `terraform init && terraform apply`
+6. Create the project's database and user on the shared RDS instance
+7. Populate `/<slug>/*` SSM via a gitignored `secrets.auto.tfvars`
+
+### What the module does and does not cover
+
+`modules/product/` owns **edge and routing**: S3, CloudFront, Cloudflare DNS, the
+ALB target group and its `X-Product-Id` listener rule.
+
+It deliberately excludes **compute** (ECS task definition and service) and the
+**SSM manifest**. Both are irreducibly product-specific — env blocks and manifest
+fields differ per product — so sharing them would mean threading a large map of
+pass-through variables through the module, which is worse than the duplication it
+removes.
+
+### Session cookies must be host-only
+
+`protoapp.xyz` is not on the Public Suffix List, so a cookie scoped to
+`.protoapp.xyz` is readable *and writable* by every sibling subdomain. Set session
+cookies with no `Domain=` attribute and `SameSite=Lax` minimum. Cross-project SSO
+is a non-goal; the design spec records the sanctioned path if that ever changes.
+
+### Limits
+
+The ALB allows 100 rules per listener, one per project — roughly 95 projects.
 
 ## Shared vs per-product
 
@@ -48,7 +74,9 @@ See [RUNBOOK.md](./RUNBOOK.md) for the protoapp state migration — how to move 
 | ECS cluster | platform (one service per product) |
 | ALB | platform (one listener rule + target group per product) |
 | Kafka broker | platform (one topic prefix per product) |
-| CloudFront + S3 webapp | product |
-| ACM cert | product |
-| Cloudflare DNS | product |
+| CloudFront + S3 webapp | product (via `modules/product`) |
+| ACM wildcard cert (`*.protoapp.xyz`) | platform |
+| Cloudflare zone settings | platform |
+| Cloudflare DNS record | product (via `modules/product`) |
+| CloudFront cache/origin-request policies, SPA function | platform (shared) |
 | SSM params | `/platform/*` for shared infra, per-product paths for each product |

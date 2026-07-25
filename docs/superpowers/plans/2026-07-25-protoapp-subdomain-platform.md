@@ -13,7 +13,11 @@
 ## Global Constraints
 
 - **This is Terraform, not application code.** The TDD cycle maps to: write config → `terraform validate` → `terraform plan` and assert on the diff → apply → verify against AWS. The plan *is* the test.
-- **Zero-diff gate:** `terraform plan -detailed-exitcode` exits `0` for no changes, `2` for changes present, `1` for error. Refactor tasks must exit `0`.
+- **The migration gate.** The property that matters is **nothing is replaced**, not literally zero diff. For the module migrations (Tasks 6 and 7):
+  - **No resource may show `must be replaced` or `will be destroyed`.** Absolute. A replaced `aws_s3_bucket` destroys live webapp assets; a replaced `aws_cloudfront_distribution` drops the site for ~20 minutes.
+  - Every remaining change must be `~ update in-place`, individually enumerated, with a stated reason it is non-functional.
+  - Expect a small set of deliberate cosmetic normalizations: `Name`/`Environment` tags aligned across products, an OAC `description` added, and the ALB origin's `origin_id` standardized to `ALB-API` (an internal identifier linking origin to cache behaviour — inert as long as both sides agree, which they do inside the module).
+  - `terraform plan -detailed-exitcode` exits `0` for no changes, `2` for changes present, `1` for error. Tasks that genuinely should be no-ops (e.g. Task 2's product half) still require exit `0`.
 - **Never approve a plan showing `must be replaced`** on: `aws_s3_bucket`, `aws_cloudfront_distribution`, `aws_lb_target_group`, `aws_ecs_service`. It means a missing name override.
 - **Region is `us-east-1`** for everything. CloudFront certs must live there.
 - **Each product keeps its own state bucket.** `platform` → `protoapp-infra-terraform-state`, protoapp/meerkat → `protoapp-terraform-state`, sjocamp → `sjocamp-terraform-state`. Do not rename state buckets.
@@ -21,6 +25,45 @@
 - **Never run `aws ssm put-parameter` by hand.** Secrets flow from gitignored `secrets.auto.tfvars` through Terraform (`products/*/secrets.tf:3-5`).
 - **Commit after every task.** These are infrastructure changes; a clean history is the rollback mechanism.
 - Personal prototype projects — brief downtime is acceptable. Do not add complexity to avoid it.
+
+## Verifying API routing — do NOT assert on status codes alone
+
+**`/api/health` is not a route on these apps.** The target group's health check
+path is `/health`, and the ALB performs it directly against the instance,
+bypassing listener rules entirely. So *any* `/api/...` probe returns 404 whether
+routing works or not, and a naive `expect 200` check reports false failures.
+
+What distinguishes success from failure is **which component answered**:
+
+| Answered by | Signature | Meaning |
+|---|---|---|
+| The app | `content-type: application/json`, an `x-request-id` header, body `{"code":"NOT_FOUND",...}` | Routing WORKS — header injected, rule matched, request reached the service |
+| The ALB | `server: awselb/2.0`, `content-type: text/plain`, body `Not Found` | Request did NOT reach any service — it hit the listener's `fixed_response` default |
+
+Use these two helpers for every routing check in this plan:
+
+```bash
+# Routing works when the APP answers (json + x-request-id), regardless of status.
+check_api() {  # check_api <label> <base-url>
+  if curl -s -i "$2/api/health" | grep -qi 'x-request-id'; then
+    echo "$1 routed to app  OK"
+  else
+    echo "$1 NOT routed — ALB default answered  FAIL"
+  fi
+}
+
+# The catch-all is closed when the ALB answers instead of any app.
+check_alb_closed() {  # check_alb_closed <alb-dns>
+  if curl -s -i "http://$1/api/health" | grep -qi 'server: awselb'; then
+    echo "unrouted -> ALB 404  OK (catch-all closed)"
+  else
+    echo "unrouted REACHED AN APP  FAIL"
+  fi
+}
+```
+
+Plain `%{http_code}` checks remain correct for the static site (`/` and SPA
+routes), which genuinely return 200 from S3.
 
 ---
 
@@ -38,7 +81,6 @@
 | `modules/product/cloudfront.tf` | **new** — S3 bucket, policy, OAC, distribution |
 | `modules/product/alb-routing.tf` | **new** — target group + `X-Product-Id` listener rule |
 | `modules/product/domain.tf` | **new** — Cloudflare CNAME for the subdomain |
-| `modules/product/manifest.tf` | **new** — SSM `/{product}/manifest` |
 | `modules/product/outputs.tf` | **new** — target group ARN, distribution id, bucket id |
 | `products/sjocamp/main.tf` | + module call + `moved` blocks |
 | `products/meerkat/` | renamed from `products/protoapp/` |
@@ -128,11 +170,11 @@ aws cloudfront get-distribution --id "$(terraform -chdir=products/protoapp outpu
 
 ```bash
 # Real traffic still routes:
-curl -s -o /dev/null -w '%{http_code}\n' https://protoapp.xyz/api/health   # expect 200
+check_api "protoapp api" https://protoapp.xyz
 
 # Direct ALB hit without the header now 404s instead of reaching protoapp:
 ALB=$(terraform -chdir=platform output -raw alb_dns_name)
-curl -s -o /dev/null -w '%{http_code}\n' "http://$ALB/api/health"          # expect 404
+check_alb_closed "$ALB"
 ```
 
 - [ ] **Step 6: Commit**
@@ -184,17 +226,27 @@ In `platform/main.tf`, inside `required_providers`:
     }
 ```
 
-In `platform/provider.tf`, append:
+In `platform/provider.tf`, append — this must match `products/protoapp/provider.tf` exactly, which authenticates with the Cloudflare *global API key* pulled from SSM plus an account email, **not** an API token from the environment:
 
 ```hcl
-provider "cloudflare" {}
-```
+data "aws_ssm_parameter" "cloudflare_api_key" {
+  name = "/cloudflare/api_key"
+}
 
-The provider reads `CLOUDFLARE_API_TOKEN` from the environment, matching how the product stacks already authenticate.
+provider "cloudflare" {
+  email   = var.cloudflare_email
+  api_key = data.aws_ssm_parameter.cloudflare_api_key.value
+}
+```
 
 In `platform/variables.tf`, append:
 
 ```hcl
+variable "cloudflare_email" {
+  description = "Cloudflare account email (paired with the global API key from /cloudflare/api_key)"
+  type        = string
+}
+
 variable "cloudflare_zone_id" {
   description = "Cloudflare zone ID for the umbrella zone (protoapp.xyz)"
   type        = string
@@ -327,7 +379,9 @@ terraform -chdir=platform validate
 terraform -chdir=platform plan
 ```
 
-Expected: three resources show `will be imported`, five `cloudflare_zone_setting` show `will be created`. **No resource may show `will be destroyed` or `must be replaced`.** If the ACM cert shows as created rather than imported, the ARN in Step 3 is wrong — stop and fix it.
+Expected: three resources show `will be imported`, five `cloudflare_zone_setting` show `will be created`. If the ACM cert shows as created rather than imported, the ARN in Step 3 is wrong — stop and fix it.
+
+**No resource may show `will be destroyed` or `must be replaced`, with one known exception:** `platform/` carries pre-existing AMI drift (see Task 3 Step 3) that replaces `aws_launch_configuration.app_launch_config_with_ssm` and updates the ASG in place. If that drift has not been resolved separately beforehand, those two entries are expected here too — and are the *only* permitted destroy/replace entries.
 
 - [ ] **Step 6: Apply platform, then release the product's claim**
 
@@ -507,7 +561,9 @@ terraform -chdir=platform validate
 terraform -chdir=platform plan
 ```
 
-Expected: exactly 3 to add, 0 to change, 0 to destroy. The new names (`shared-*`) cannot collide with the existing per-product names.
+Expected: 3 to add for this task's resources, and the new `shared-*` names cannot collide with the existing per-product names.
+
+**`platform/` carries pre-existing drift.** `image_id` on `aws_launch_configuration.app_launch_config_with_ssm` comes from SSM's latest-recommended-AMI pointer (`platform/ecs.tf:72`), so whenever AWS publishes a new ECS-optimized AMI the launch configuration shows `must be replaced` and the ASG shows an in-place update. This is unrelated to this task. Either resolve it before starting (apply it on its own so the change is attributable) or treat the expected plan as *3 additions plus exactly those two known drift entries* — and nothing else.
 
 - [ ] **Step 4: Apply and commit**
 
@@ -580,9 +636,9 @@ done
 
 ```bash
 curl -s -o /dev/null -w 'protoapp %{http_code}\n' https://protoapp.xyz/
-curl -s -o /dev/null -w 'protoapp api %{http_code}\n' https://protoapp.xyz/api/health
+check_api "protoapp api" https://protoapp.xyz
 curl -s -o /dev/null -w 'sjocamp %{http_code}\n' https://app.sjocamp.co/
-curl -s -o /dev/null -w 'sjocamp api %{http_code}\n' https://app.sjocamp.co/api/health
+check_api "sjocamp api" https://app.sjocamp.co
 ```
 
 All four must return 200. A deep-link check confirms the shared SPA function works:
@@ -621,13 +677,37 @@ resources, then removed the per-product duplicates."
 The module owns edge and routing only. Compute stays per-product — see the spec's "Target architecture" for why.
 
 **Files:**
-- Create: `modules/product/variables.tf`, `cloudfront.tf`, `alb-routing.tf`, `domain.tf`, `manifest.tf`, `outputs.tf`
+- Create: `modules/product/versions.tf`, `variables.tf`, `cloudfront.tf`, `alb-routing.tf`, `domain.tf`, `outputs.tf`
+- **NOT** created: `modules/product/manifest.tf`. The SSM manifest stays per-product — see note below.
 
 **Interfaces:**
 - Consumes: platform outputs from Tasks 2-3, passed in as variables.
 - Produces: `module.product.target_group_arn`, `.cloudfront_distribution_id`, `.cloudfront_domain_name`, `.webapp_bucket_id`. Tasks 6-7 consume these.
 
-- [ ] **Step 1: Write modules/product/variables.tf**
+- [ ] **Step 1: Write modules/product/versions.tf**
+
+A child module resolves provider source addresses from **its own** `required_providers` block, not the root's. Without `cloudflare` declared here, Terraform assumes `hashicorp/cloudflare` and `init` fails — both standalone and in every root stack that consumes the module, regardless of what the root declares.
+
+```hcl
+terraform {
+  required_version = ">= 1.2.0"
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "~> 5.0"
+    }
+  }
+}
+```
+
+No `provider` configuration blocks and no `backend` in the module — those stay in the root stacks, which pass configured providers down.
+
+- [ ] **Step 2: Write modules/product/variables.tf**
 
 ```hcl
 variable "product" {
@@ -976,35 +1056,24 @@ resource "cloudflare_dns_record" "app" {
 
 `proxied = false` is required: CloudFront terminates TLS with the ACM cert, and the zone's SSL mode is `strict`.
 
-- [ ] **Step 5: Write modules/product/manifest.tf and outputs.tf**
+- [ ] **Step 5: Write modules/product/outputs.tf**
 
-`manifest.tf`:
+**The SSM manifest deliberately stays OUT of the module** — same reason as the
+ECS task definition and service. It assembles the ECR repository, ECS cluster and
+service names, the landing domain, and per-product Sentry config: values that
+live in the product stack and differ per product. sjocamp's manifest carries a
+`sentry` block; protoapp's carries `captureWorkerEcrRepository` and
+`captureWorkerEcsService`.
 
-```hcl
-# Machine-readable product descriptor consumed by app repos and CI so deploy
-# workflows need no hardcoded ids.
-resource "aws_ssm_parameter" "manifest" {
-  name = "/${var.product}/manifest"
-  type = "String"
-  tier = "Advanced"
-  value = jsonencode({
-    name = var.display_name
-    slug = var.product
-    domains = {
-      app = var.domain
-    }
-    aws = {
-      region                   = var.aws_region
-      webappS3Bucket           = aws_s3_bucket.webapp.id
-      cloudfrontDistributionId = aws_cloudfront_distribution.webapp.id
-    }
-    ssm = {
-      productPrefix  = "/${var.product}"
-      platformPrefix = "/platform"
-    }
-  })
-}
-```
+A shared version would need roughly seven pass-through variables — worse than the
+duplication it removes — and an under-scoped version silently drops fields that
+app repos and CI read at deploy time. Each product keeps its own `manifest.tf`,
+pulling the two values the module owns from
+`module.product.webapp_bucket_id` and `module.product.cloudfront_distribution_id`.
+
+Because the manifest is out, `var.display_name` and `var.aws_region` may have no
+remaining consumer inside the module. Grep before removing either — delete only
+what is genuinely unreferenced, and stop passing it from the product stacks.
 
 `outputs.tf`:
 
@@ -1065,7 +1134,7 @@ sjocamp first — it is the template the module was extracted from, so its diff 
 
 **Files:**
 - Modify: `products/sjocamp/main.tf` (module call + `moved` blocks)
-- Delete: `products/sjocamp/s3-cloudfront.tf`, `alb-routing.tf`, `manifest.tf`
+- Delete: `products/sjocamp/s3-cloudfront.tf`, `alb-routing.tf` (KEEP `manifest.tf`)
 - Modify: `products/sjocamp/domain.tf`, `ecs-service.tf`, `outputs.tf`
 
 **Interfaces:**
@@ -1080,11 +1149,9 @@ Append to `products/sjocamp/main.tf`:
 module "product" {
   source = "../../modules/product"
 
-  product      = var.product
-  display_name = var.display_name
-  domain       = var.domain_name
-  aws_region   = var.aws_region
-  environment  = var.environment
+  product     = var.product
+  domain      = var.domain_name
+  environment = var.environment
 
   platform_alb_dns_name        = data.terraform_remote_state.platform.outputs.alb_dns_name
   platform_alb_listener_arn    = data.terraform_remote_state.platform.outputs.alb_listener_http_arn
@@ -1157,11 +1224,6 @@ moved {
   from = cloudflare_dns_record.app_to_cloudfront
   to   = module.product.cloudflare_dns_record.app[0]
 }
-
-moved {
-  from = aws_ssm_parameter.manifest
-  to   = module.product.aws_ssm_parameter.manifest
-}
 ```
 
 The `[0]` index on the DNS record is required — `manage_dns_record` makes it a counted resource.
@@ -1169,7 +1231,8 @@ The `[0]` index on the DNS record is required — `manage_dns_record` makes it a
 - [ ] **Step 3: Delete the superseded files and fix references**
 
 ```bash
-git rm products/sjocamp/s3-cloudfront.tf products/sjocamp/alb-routing.tf products/sjocamp/manifest.tf
+git rm products/sjocamp/s3-cloudfront.tf products/sjocamp/alb-routing.tf
+# NOTE: manifest.tf is deliberately KEPT — see the module-boundary note in Task 5.
 ```
 
 In `products/sjocamp/domain.tf`, delete `cloudflare_dns_record.app_to_cloudfront` (the module owns it now). Keep the cert and its validation record.
@@ -1223,7 +1286,7 @@ Even at `exit=0`, apply so the state records the moves:
 ```bash
 terraform -chdir=products/sjocamp apply
 curl -s -o /dev/null -w 'sjocamp %{http_code}\n' https://app.sjocamp.co/
-curl -s -o /dev/null -w 'sjocamp api %{http_code}\n' https://app.sjocamp.co/api/health
+check_api "sjocamp api" https://app.sjocamp.co
 ```
 
 Both must return 200.
@@ -1246,7 +1309,7 @@ Same mechanism as Task 6, but protoapp is the legacy stack with six hardcoded na
 
 **Files:**
 - Modify: `products/protoapp/main.tf`
-- Delete: `products/protoapp/s3-cloudfront.tf`, `alb-routing.tf`, `manifest.tf`
+- Delete: `products/protoapp/s3-cloudfront.tf`, `alb-routing.tf` (KEEP `manifest.tf`)
 - Modify: `products/protoapp/domain.tf`, `ecs-service.tf`, `capture-worker.tf`, `outputs.tf`
 
 **Interfaces:**
@@ -1261,11 +1324,9 @@ Append to `products/protoapp/main.tf`:
 module "product" {
   source = "../../modules/product"
 
-  product      = var.product
-  display_name = var.display_name
-  domain       = var.domain_name
-  aws_region   = var.aws_region
-  environment  = var.environment
+  product     = var.product
+  domain      = var.domain_name
+  environment = var.environment
 
   platform_alb_dns_name        = data.terraform_remote_state.platform.outputs.alb_dns_name
   platform_alb_listener_arn    = data.terraform_remote_state.platform.outputs.alb_listener_http_arn
@@ -1327,10 +1388,32 @@ moved {
   to   = module.product.aws_cloudwatch_log_group.cloudfront
 }
 
-# Legacy name: aws_alb_target_group, not aws_lb_target_group.
-moved {
+# The target group CANNOT use a `moved` block. protoapp declares it as
+# `aws_alb_target_group`, the module as `aws_lb_target_group`. Those map to the
+# same AWS API resource inside the provider, but `moved` compares TYPE NAMES,
+# not schemas, and Terraform 1.7.5 rejects it outright:
+#
+#   Error: Resource type mismatch
+#   This statement declares a move from aws_alb_target_group.ecs_target to
+#   module.product.aws_lb_target_group.api, which is a resource of a different type.
+#
+# Cross-type moves need Terraform >= 1.8 AND a provider that implements
+# MoveState for the pair; the AWS provider does not for this alias.
+#
+# Use `removed` + `import` instead. This keeps the property that actually
+# matters -- the state change is declarative and previewable with `terraform
+# plan` -- which `terraform state mv` would not, since it mutates state
+# immediately with no diff to review.
+removed {
   from = aws_alb_target_group.ecs_target
-  to   = module.product.aws_lb_target_group.api
+  lifecycle {
+    destroy = false
+  }
+}
+
+import {
+  to = module.product.aws_lb_target_group.api
+  id = "REPLACE_WITH_LIVE_TARGET_GROUP_ARN"
 }
 
 moved {
@@ -1342,21 +1425,29 @@ moved {
   from = cloudflare_dns_record.root_to_cloudfront
   to   = module.product.cloudflare_dns_record.app[0]
 }
-
-moved {
-  from = aws_ssm_parameter.manifest
-  to   = module.product.aws_ssm_parameter.manifest
-}
 ```
 
-`aws_alb_target_group` and `aws_lb_target_group` are aliases for the same AWS API resource, so this move is valid.
+Capture the live target group ARN for the `import` block with:
+
+```bash
+terraform -chdir=products/protoapp state show aws_alb_target_group.ecs_target | grep -E '^\s+arn\s+='
+```
 
 `cloudflare_dns_record.www_to_cloudfront` stays in the product stack — the module manages exactly one record, and www is an extra alias.
+
+`aws_ssm_parameter.manifest` gets **no** `moved` block and stays in
+`products/protoapp/manifest.tf`. The module does not define one — see the
+module-boundary note in Task 5. protoapp's manifest is the richer of the two
+(it also carries `captureWorkerEcrRepository` and `captureWorkerEcsService`), so
+keep every field and repoint only `webappS3Bucket` and `cloudfrontDistributionId`
+to `module.product.webapp_bucket_id` / `module.product.cloudfront_distribution_id`.
+The module declares neither `display_name` nor `aws_region`, so do not pass them.
 
 - [ ] **Step 3: Delete superseded files and fix references**
 
 ```bash
-git rm products/protoapp/s3-cloudfront.tf products/protoapp/alb-routing.tf products/protoapp/manifest.tf
+git rm products/protoapp/s3-cloudfront.tf products/protoapp/alb-routing.tf
+# NOTE: manifest.tf is deliberately KEPT — see the module-boundary note in Task 5.
 ```
 
 In `products/protoapp/domain.tf`, delete `cloudflare_dns_record.root_to_cloudfront`. Keep `www_to_cloudfront` but repoint it:
@@ -1396,7 +1487,7 @@ The single most dangerous failure here is `aws_s3_bucket.webapp must be replaced
 terraform -chdir=products/protoapp apply
 curl -s -o /dev/null -w 'apex %{http_code}\n' https://protoapp.xyz/
 curl -s -o /dev/null -w 'www %{http_code}\n' https://www.protoapp.xyz/
-curl -s -o /dev/null -w 'api %{http_code}\n' https://protoapp.xyz/api/health
+check_api "api" https://protoapp.xyz
 ```
 
 All three must return 200.
@@ -1513,7 +1604,7 @@ Both must be non-zero. There is never a window where neither exists.
 Deploy the app reading `/meerkat/*` (via the `/meerkat/manifest` `ssm.productPrefix` field), then:
 
 ```bash
-curl -s -o /dev/null -w 'api %{http_code}\n' https://protoapp.xyz/api/health
+check_api "api" https://protoapp.xyz
 ```
 
 Must return 200. A 502 or 503 means the ECS task cannot read its new parameter paths — check the task's IAM policy covers `/meerkat/*`.
@@ -1591,7 +1682,7 @@ Wait for `Deployed`, then:
 ```bash
 curl -s -o /dev/null -w 'old %{http_code}\n' https://protoapp.xyz/
 curl -s -o /dev/null -w 'new %{http_code}\n' https://meerkat.protoapp.xyz/
-curl -s -o /dev/null -w 'new api %{http_code}\n' https://meerkat.protoapp.xyz/api/health
+check_api "new api" https://meerkat.protoapp.xyz
 ```
 
 All three must return 200 with a valid certificate — the wildcard covers the new name, so no TLS warning.
@@ -1659,7 +1750,7 @@ Rebuild with `VITE_API_URL=https://meerkat.protoapp.xyz` and `VITE_GOOGLE_REDIRE
 ```bash
 terraform -chdir=products/meerkat apply
 curl -s -o /dev/null -w 'new %{http_code}\n' https://meerkat.protoapp.xyz/
-curl -s -o /dev/null -w 'new api %{http_code}\n' https://meerkat.protoapp.xyz/api/health
+check_api "new api" https://meerkat.protoapp.xyz
 aws ssm get-parameter --name /meerkat/web_app_uri --query 'Parameter.Value' --output text
 ```
 
@@ -1743,7 +1834,7 @@ terraform -chdir=products/sjocamp apply
 id=$(terraform -chdir=products/sjocamp output -raw cloudfront_distribution_id)
 aws cloudfront get-distribution --id "$id" --query 'Distribution.Status' --output text
 curl -s -o /dev/null -w 'new %{http_code}\n' https://sjocamp.protoapp.xyz/
-curl -s -o /dev/null -w 'new api %{http_code}\n' https://sjocamp.protoapp.xyz/api/health
+check_api "new api" https://sjocamp.protoapp.xyz
 ```
 
 - [ ] **Step 5: Re-register sjocamp's four integrations**
@@ -1954,12 +2045,12 @@ curl -s -o /dev/null -w 'meerkat %{http_code}\n' https://meerkat.protoapp.xyz/
 curl -s -o /dev/null -w 'sjocamp %{http_code}\n' https://sjocamp.protoapp.xyz/
 
 # Each API routes to its own target group
-curl -s -o /dev/null -w 'meerkat api %{http_code}\n' https://meerkat.protoapp.xyz/api/health
-curl -s -o /dev/null -w 'sjocamp api %{http_code}\n' https://sjocamp.protoapp.xyz/api/health
+check_api "meerkat api" https://meerkat.protoapp.xyz
+check_api "sjocamp api" https://sjocamp.protoapp.xyz
 
 # The catch-all is closed: no header means 404, not someone's database
 ALB=$(terraform -chdir=platform output -raw alb_dns_name)
-curl -s -o /dev/null -w 'unrouted %{http_code}\n' "http://$ALB/api/health"
+check_alb_closed "$ALB"
 
 # All three stacks are clean
 for d in platform products/meerkat products/sjocamp; do

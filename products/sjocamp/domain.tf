@@ -25,17 +25,10 @@ resource "cloudflare_dns_record" "acm_validation" {
   ttl     = 1
 }
 
-# Single CNAME for app.sjocamp.co pointing at this product's CloudFront.
-# The apex (sjocamp.co) and www are managed elsewhere (landing site on
-# Cloudflare Pages) — Terraform here intentionally does not touch them.
-resource "cloudflare_dns_record" "app_to_cloudfront" {
-  zone_id = var.cloudflare_zone_id
-  name    = var.domain_name
-  type    = "CNAME"
-  content = aws_cloudfront_distribution.webapp_distribution.domain_name
-  ttl     = 1
-  proxied = false
-}
+# The app.sjocamp.co CNAME to CloudFront is now owned by module.product
+# (cloudflare_dns_record.app). The apex (sjocamp.co) and www are managed
+# elsewhere (landing site on Cloudflare Pages) — Terraform here intentionally
+# does not touch them.
 
 # Zone-wide TLS/HTTP settings are owned by the landing-site setup; not managed
 # here so the two stacks don't fight over the same settings.
