@@ -15,13 +15,13 @@ resource "aws_alb_target_group" "ecs_target" {
   }
 }
 
-# Protoapp has no X-Product-Id header on its CloudFront, so this rule stays
-# header-less. Priority 1000 (low priority) so per-product rules with header
-# conditions (e.g. sjocamp at 100) match first. Protoapp catches anything
-# without a product-specific header — effectively the default for legacy traffic.
+# Routes /api/* carrying X-Product-Id=protoapp (injected by this product's
+# CloudFront) to protoapp's target group. Previously this rule was header-less
+# at priority 1000 and acted as a catch-all, silently absorbing any misrouted
+# /api/* traffic. The listener's 404 default is now the only fallback.
 resource "aws_lb_listener_rule" "alb_listener_rule_api_http" {
   listener_arn = data.terraform_remote_state.platform.outputs.alb_listener_http_arn
-  priority     = 1000
+  priority     = 200
 
   action {
     type             = "forward"
@@ -31,6 +31,13 @@ resource "aws_lb_listener_rule" "alb_listener_rule_api_http" {
   condition {
     path_pattern {
       values = ["/api/*"]
+    }
+  }
+
+  condition {
+    http_header {
+      http_header_name = "X-Product-Id"
+      values           = [var.product]
     }
   }
 }

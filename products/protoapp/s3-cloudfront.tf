@@ -101,6 +101,11 @@ resource "aws_cloudfront_distribution" "webapp_distribution" {
       origin_protocol_policy = "http-only"
       origin_ssl_protocols   = ["TLSv1.2"]
     }
+
+    custom_header {
+      name  = "X-Product-Id"
+      value = var.product
+    }
   }
 
   default_cache_behavior {
