@@ -125,6 +125,24 @@ variable "log_retention_days" {
   default     = null
 }
 
+# --- Alarms ---
+
+variable "alerts_topic_arn" {
+  description = "SNS topic for product alarms. Required when tier = product; ignored for prototypes."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.tier != "product" || var.alerts_topic_arn != null
+    error_message = "alerts_topic_arn is required when tier = \"product\" — alarms with no destination are worse than no alarms."
+  }
+}
+
+variable "platform_alb_arn_suffix" {
+  description = "Shared ALB ARN suffix, required as a CloudWatch dimension for target-group alarms."
+  type        = string
+}
+
 locals {
   s3_bucket_name     = coalesce(var.s3_bucket_name, "protoapp-${var.product}-webapp")
   target_group_name  = coalesce(var.target_group_name, "${var.product}-api-tg")

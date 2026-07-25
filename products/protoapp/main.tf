@@ -45,6 +45,8 @@ module "product" {
 
   alb_rule_priority = 200
 
+  platform_alb_arn_suffix = data.terraform_remote_state.platform.outputs.alb_arn_suffix
+
   # protoapp currently serves the apex plus www.
   extra_aliases = ["www.${var.domain_name}"]
 

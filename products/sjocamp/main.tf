@@ -41,6 +41,9 @@ module "product" {
 
   alb_rule_priority = var.alb_rule_priority
 
+  alerts_topic_arn        = data.terraform_remote_state.platform.outputs.alerts_topic_arn
+  platform_alb_arn_suffix = data.terraform_remote_state.platform.outputs.alb_arn_suffix
+
   # Live names — omitting any of these replaces the resource.
   s3_bucket_name    = "app.sjocamp.co-webapp"
   target_group_name = "sjocamp-api-tg"
