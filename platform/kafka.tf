@@ -106,9 +106,13 @@ resource "aws_service_discovery_service" "kafka" {
     routing_policy = "MULTIVALUE"
   }
 
-  health_check_custom_config {
-    failure_threshold = 1
-  }
+  # No health_check_custom_config block: its only argument, failure_threshold,
+  # was deprecated in AWS provider v6 (AWS ignores the value and always uses 1).
+  # Dropping it replaced this service — the block is ForceNew — so Kafka DNS
+  # went down for the swap in 2026-07. Do not "restore" it as an empty
+  # `health_check_custom_config {}`: AWS stores no config at all when the
+  # argument is absent, so an empty block reads as a permanent diff and plans a
+  # replacement on every run. Omit the block entirely.
 
   tags = {
     Name = "Kafka Service Discovery"
