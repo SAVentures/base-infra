@@ -631,13 +631,36 @@ resources, then removed the per-product duplicates."
 The module owns edge and routing only. Compute stays per-product — see the spec's "Target architecture" for why.
 
 **Files:**
-- Create: `modules/product/variables.tf`, `cloudfront.tf`, `alb-routing.tf`, `domain.tf`, `manifest.tf`, `outputs.tf`
+- Create: `modules/product/versions.tf`, `variables.tf`, `cloudfront.tf`, `alb-routing.tf`, `domain.tf`, `manifest.tf`, `outputs.tf`
 
 **Interfaces:**
 - Consumes: platform outputs from Tasks 2-3, passed in as variables.
 - Produces: `module.product.target_group_arn`, `.cloudfront_distribution_id`, `.cloudfront_domain_name`, `.webapp_bucket_id`. Tasks 6-7 consume these.
 
-- [ ] **Step 1: Write modules/product/variables.tf**
+- [ ] **Step 1: Write modules/product/versions.tf**
+
+A child module resolves provider source addresses from **its own** `required_providers` block, not the root's. Without `cloudflare` declared here, Terraform assumes `hashicorp/cloudflare` and `init` fails — both standalone and in every root stack that consumes the module, regardless of what the root declares.
+
+```hcl
+terraform {
+  required_version = ">= 1.2.0"
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "~> 5.0"
+    }
+  }
+}
+```
+
+No `provider` configuration blocks and no `backend` in the module — those stay in the root stacks, which pass configured providers down.
+
+- [ ] **Step 2: Write modules/product/variables.tf**
 
 ```hcl
 variable "product" {
