@@ -14,6 +14,21 @@ variable "environment" {
   default     = "production"
 }
 
+variable "tier" {
+  description = "prototype = disposable, lives on a subdomain of the umbrella zone. product = real, lives on its own domain."
+  type        = string
+
+  validation {
+    condition     = contains(["prototype", "product"], var.tier)
+    error_message = "tier must be \"prototype\" or \"product\"."
+  }
+}
+
+variable "umbrella_zone_domain" {
+  description = "The umbrella zone (protoapp.xyz). Used only to validate placement."
+  type        = string
+}
+
 # --- Platform wiring ---
 
 variable "platform_alb_dns_name" {
@@ -31,9 +46,9 @@ variable "platform_vpc_id" {
   description = "Shared VPC ID for the target group"
 }
 
-variable "platform_acm_certificate_arn" {
+variable "acm_certificate_arn" {
   type        = string
-  description = "Wildcard cert covering this product's domain"
+  description = "Certificate covering this product's domain. Prototypes pass the platform wildcard; products pass their own cert, created in their stack."
 }
 
 variable "cloudflare_zone_id" {

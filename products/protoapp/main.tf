@@ -29,11 +29,14 @@ module "product" {
   product     = var.product
   domain      = var.domain_name
   environment = var.environment
+  tier        = "prototype"
 
-  platform_alb_dns_name        = data.terraform_remote_state.platform.outputs.alb_dns_name
-  platform_alb_listener_arn    = data.terraform_remote_state.platform.outputs.alb_listener_http_arn
-  platform_vpc_id              = data.terraform_remote_state.platform.outputs.vpc_id
-  platform_acm_certificate_arn = data.terraform_remote_state.platform.outputs.acm_certificate_arn
+  umbrella_zone_domain = data.terraform_remote_state.platform.outputs.zone_domain
+
+  platform_alb_dns_name     = data.terraform_remote_state.platform.outputs.alb_dns_name
+  platform_alb_listener_arn = data.terraform_remote_state.platform.outputs.alb_listener_http_arn
+  platform_vpc_id           = data.terraform_remote_state.platform.outputs.vpc_id
+  acm_certificate_arn       = data.terraform_remote_state.platform.outputs.acm_certificate_arn
 
   cloudflare_zone_id                  = var.cloudflare_zone_id
   cloudfront_cache_policy_id          = data.terraform_remote_state.platform.outputs.cloudfront_api_cache_policy_id
