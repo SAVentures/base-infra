@@ -1149,11 +1149,9 @@ Append to `products/sjocamp/main.tf`:
 module "product" {
   source = "../../modules/product"
 
-  product      = var.product
-  display_name = var.display_name
-  domain       = var.domain_name
-  aws_region   = var.aws_region
-  environment  = var.environment
+  product     = var.product
+  domain      = var.domain_name
+  environment = var.environment
 
   platform_alb_dns_name        = data.terraform_remote_state.platform.outputs.alb_dns_name
   platform_alb_listener_arn    = data.terraform_remote_state.platform.outputs.alb_listener_http_arn
@@ -1225,11 +1223,6 @@ moved {
 moved {
   from = cloudflare_dns_record.app_to_cloudfront
   to   = module.product.cloudflare_dns_record.app[0]
-}
-
-moved {
-  from = aws_ssm_parameter.manifest
-  to   = module.product.aws_ssm_parameter.manifest
 }
 ```
 
@@ -1331,11 +1324,9 @@ Append to `products/protoapp/main.tf`:
 module "product" {
   source = "../../modules/product"
 
-  product      = var.product
-  display_name = var.display_name
-  domain       = var.domain_name
-  aws_region   = var.aws_region
-  environment  = var.environment
+  product     = var.product
+  domain      = var.domain_name
+  environment = var.environment
 
   platform_alb_dns_name        = data.terraform_remote_state.platform.outputs.alb_dns_name
   platform_alb_listener_arn    = data.terraform_remote_state.platform.outputs.alb_listener_http_arn
@@ -1412,16 +1403,19 @@ moved {
   from = cloudflare_dns_record.root_to_cloudfront
   to   = module.product.cloudflare_dns_record.app[0]
 }
-
-moved {
-  from = aws_ssm_parameter.manifest
-  to   = module.product.aws_ssm_parameter.manifest
-}
 ```
 
 `aws_alb_target_group` and `aws_lb_target_group` are aliases for the same AWS API resource, so this move is valid.
 
 `cloudflare_dns_record.www_to_cloudfront` stays in the product stack — the module manages exactly one record, and www is an extra alias.
+
+`aws_ssm_parameter.manifest` gets **no** `moved` block and stays in
+`products/protoapp/manifest.tf`. The module does not define one — see the
+module-boundary note in Task 5. protoapp's manifest is the richer of the two
+(it also carries `captureWorkerEcrRepository` and `captureWorkerEcsService`), so
+keep every field and repoint only `webappS3Bucket` and `cloudfrontDistributionId`
+to `module.product.webapp_bucket_id` / `module.product.cloudfront_distribution_id`.
+The module declares neither `display_name` nor `aws_region`, so do not pass them.
 
 - [ ] **Step 3: Delete superseded files and fix references**
 
