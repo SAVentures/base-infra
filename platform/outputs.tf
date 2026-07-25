@@ -72,3 +72,18 @@ output "cloudfront_spa_function_arn" {
   value       = aws_cloudfront_function.spa_routing.arn
   description = "Shared viewer-request function rewriting SPA routes to index.html"
 }
+
+output "acm_certificate_arn" {
+  value       = aws_acm_certificate.wildcard.arn
+  description = "Wildcard cert covering protoapp.xyz and *.protoapp.xyz; used by every product CloudFront"
+}
+
+output "cloudflare_zone_id" {
+  value       = var.cloudflare_zone_id
+  description = "Cloudflare zone ID for the umbrella zone"
+}
+
+output "zone_domain" {
+  value       = var.zone_domain
+  description = "Umbrella domain hosting all product subdomains"
+}
