@@ -57,3 +57,18 @@ output "kafka_bootstrap_servers" {
   value       = "kafka.base-services.local:9092"
   description = "Internal Kafka endpoint (shared)"
 }
+
+output "cloudfront_api_cache_policy_id" {
+  value       = aws_cloudfront_cache_policy.api_no_cache.id
+  description = "Shared no-cache policy for /api/* behaviours"
+}
+
+output "cloudfront_api_origin_request_policy_id" {
+  value       = aws_cloudfront_origin_request_policy.api_origin_request.id
+  description = "Shared origin-request policy forwarding viewer headers to the API"
+}
+
+output "cloudfront_spa_function_arn" {
+  value       = aws_cloudfront_function.spa_routing.arn
+  description = "Shared viewer-request function rewriting SPA routes to index.html"
+}
