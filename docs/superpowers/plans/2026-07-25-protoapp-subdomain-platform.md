@@ -22,6 +22,45 @@
 - **Commit after every task.** These are infrastructure changes; a clean history is the rollback mechanism.
 - Personal prototype projects — brief downtime is acceptable. Do not add complexity to avoid it.
 
+## Verifying API routing — do NOT assert on status codes alone
+
+**`/api/health` is not a route on these apps.** The target group's health check
+path is `/health`, and the ALB performs it directly against the instance,
+bypassing listener rules entirely. So *any* `/api/...` probe returns 404 whether
+routing works or not, and a naive `expect 200` check reports false failures.
+
+What distinguishes success from failure is **which component answered**:
+
+| Answered by | Signature | Meaning |
+|---|---|---|
+| The app | `content-type: application/json`, an `x-request-id` header, body `{"code":"NOT_FOUND",...}` | Routing WORKS — header injected, rule matched, request reached the service |
+| The ALB | `server: awselb/2.0`, `content-type: text/plain`, body `Not Found` | Request did NOT reach any service — it hit the listener's `fixed_response` default |
+
+Use these two helpers for every routing check in this plan:
+
+```bash
+# Routing works when the APP answers (json + x-request-id), regardless of status.
+check_api() {  # check_api <label> <base-url>
+  if curl -s -i "$2/api/health" | grep -qi 'x-request-id'; then
+    echo "$1 routed to app  OK"
+  else
+    echo "$1 NOT routed — ALB default answered  FAIL"
+  fi
+}
+
+# The catch-all is closed when the ALB answers instead of any app.
+check_alb_closed() {  # check_alb_closed <alb-dns>
+  if curl -s -i "http://$1/api/health" | grep -qi 'server: awselb'; then
+    echo "unrouted -> ALB 404  OK (catch-all closed)"
+  else
+    echo "unrouted REACHED AN APP  FAIL"
+  fi
+}
+```
+
+Plain `%{http_code}` checks remain correct for the static site (`/` and SPA
+routes), which genuinely return 200 from S3.
+
 ---
 
 ## File Structure
@@ -128,11 +167,11 @@ aws cloudfront get-distribution --id "$(terraform -chdir=products/protoapp outpu
 
 ```bash
 # Real traffic still routes:
-curl -s -o /dev/null -w '%{http_code}\n' https://protoapp.xyz/api/health   # expect 200
+check_api "protoapp api" https://protoapp.xyz
 
 # Direct ALB hit without the header now 404s instead of reaching protoapp:
 ALB=$(terraform -chdir=platform output -raw alb_dns_name)
-curl -s -o /dev/null -w '%{http_code}\n' "http://$ALB/api/health"          # expect 404
+check_alb_closed "$ALB"
 ```
 
 - [ ] **Step 6: Commit**
@@ -594,9 +633,9 @@ done
 
 ```bash
 curl -s -o /dev/null -w 'protoapp %{http_code}\n' https://protoapp.xyz/
-curl -s -o /dev/null -w 'protoapp api %{http_code}\n' https://protoapp.xyz/api/health
+check_api "protoapp api" https://protoapp.xyz
 curl -s -o /dev/null -w 'sjocamp %{http_code}\n' https://app.sjocamp.co/
-curl -s -o /dev/null -w 'sjocamp api %{http_code}\n' https://app.sjocamp.co/api/health
+check_api "sjocamp api" https://app.sjocamp.co
 ```
 
 All four must return 200. A deep-link check confirms the shared SPA function works:
@@ -1260,7 +1299,7 @@ Even at `exit=0`, apply so the state records the moves:
 ```bash
 terraform -chdir=products/sjocamp apply
 curl -s -o /dev/null -w 'sjocamp %{http_code}\n' https://app.sjocamp.co/
-curl -s -o /dev/null -w 'sjocamp api %{http_code}\n' https://app.sjocamp.co/api/health
+check_api "sjocamp api" https://app.sjocamp.co
 ```
 
 Both must return 200.
@@ -1433,7 +1472,7 @@ The single most dangerous failure here is `aws_s3_bucket.webapp must be replaced
 terraform -chdir=products/protoapp apply
 curl -s -o /dev/null -w 'apex %{http_code}\n' https://protoapp.xyz/
 curl -s -o /dev/null -w 'www %{http_code}\n' https://www.protoapp.xyz/
-curl -s -o /dev/null -w 'api %{http_code}\n' https://protoapp.xyz/api/health
+check_api "api" https://protoapp.xyz
 ```
 
 All three must return 200.
@@ -1550,7 +1589,7 @@ Both must be non-zero. There is never a window where neither exists.
 Deploy the app reading `/meerkat/*` (via the `/meerkat/manifest` `ssm.productPrefix` field), then:
 
 ```bash
-curl -s -o /dev/null -w 'api %{http_code}\n' https://protoapp.xyz/api/health
+check_api "api" https://protoapp.xyz
 ```
 
 Must return 200. A 502 or 503 means the ECS task cannot read its new parameter paths — check the task's IAM policy covers `/meerkat/*`.
@@ -1628,7 +1667,7 @@ Wait for `Deployed`, then:
 ```bash
 curl -s -o /dev/null -w 'old %{http_code}\n' https://protoapp.xyz/
 curl -s -o /dev/null -w 'new %{http_code}\n' https://meerkat.protoapp.xyz/
-curl -s -o /dev/null -w 'new api %{http_code}\n' https://meerkat.protoapp.xyz/api/health
+check_api "new api" https://meerkat.protoapp.xyz
 ```
 
 All three must return 200 with a valid certificate — the wildcard covers the new name, so no TLS warning.
@@ -1696,7 +1735,7 @@ Rebuild with `VITE_API_URL=https://meerkat.protoapp.xyz` and `VITE_GOOGLE_REDIRE
 ```bash
 terraform -chdir=products/meerkat apply
 curl -s -o /dev/null -w 'new %{http_code}\n' https://meerkat.protoapp.xyz/
-curl -s -o /dev/null -w 'new api %{http_code}\n' https://meerkat.protoapp.xyz/api/health
+check_api "new api" https://meerkat.protoapp.xyz
 aws ssm get-parameter --name /meerkat/web_app_uri --query 'Parameter.Value' --output text
 ```
 
@@ -1780,7 +1819,7 @@ terraform -chdir=products/sjocamp apply
 id=$(terraform -chdir=products/sjocamp output -raw cloudfront_distribution_id)
 aws cloudfront get-distribution --id "$id" --query 'Distribution.Status' --output text
 curl -s -o /dev/null -w 'new %{http_code}\n' https://sjocamp.protoapp.xyz/
-curl -s -o /dev/null -w 'new api %{http_code}\n' https://sjocamp.protoapp.xyz/api/health
+check_api "new api" https://sjocamp.protoapp.xyz
 ```
 
 - [ ] **Step 5: Re-register sjocamp's four integrations**
@@ -1991,12 +2030,12 @@ curl -s -o /dev/null -w 'meerkat %{http_code}\n' https://meerkat.protoapp.xyz/
 curl -s -o /dev/null -w 'sjocamp %{http_code}\n' https://sjocamp.protoapp.xyz/
 
 # Each API routes to its own target group
-curl -s -o /dev/null -w 'meerkat api %{http_code}\n' https://meerkat.protoapp.xyz/api/health
-curl -s -o /dev/null -w 'sjocamp api %{http_code}\n' https://sjocamp.protoapp.xyz/api/health
+check_api "meerkat api" https://meerkat.protoapp.xyz
+check_api "sjocamp api" https://sjocamp.protoapp.xyz
 
 # The catch-all is closed: no header means 404, not someone's database
 ALB=$(terraform -chdir=platform output -raw alb_dns_name)
-curl -s -o /dev/null -w 'unrouted %{http_code}\n' "http://$ALB/api/health"
+check_alb_closed "$ALB"
 
 # All three stacks are clean
 for d in platform products/meerkat products/sjocamp; do
