@@ -618,7 +618,7 @@ Every deployment is one of two tiers, set by `tier` on `modules/product`:
 | Domain | `<slug>.protoapp.xyz` | its own domain |
 | Certificate | shared `*.protoapp.xyz` wildcard | its own, created in its stack |
 | Log retention | 7 days | 90 days |
-| Alarms | none | unhealthy hosts + target 5xx |
+| Alarms | none | no healthy hosts + target 5xx |
 
 A prototype is disposable and may break quietly. A product is shipped software
 and pages you. `modules/product` validates placement, so a prototype cannot be

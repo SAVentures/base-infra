@@ -41,7 +41,7 @@ Product stacks read `platform/outputs.tf` through `data "terraform_remote_state"
 
 ## Routing model
 
-Every product is a subdomain of `protoapp.xyz`: static SPA on S3 + CloudFront, with `/api/*` forwarded to the one shared ALB.
+Every product is served the same way regardless of tier: a static SPA on S3 + CloudFront, with `/api/*` forwarded to the one shared ALB. Only the hostname differs — prototypes serve from a `<slug>.protoapp.xyz` subdomain, products serve from their own domain (sjocamp already does, at `app.sjocamp.co`).
 
 CloudFront injects an `X-Product-Id: <slug>` header on the API origin. The ALB listener rule matches `path /api/*` **AND** that header — deliberately not `host_header`, so a product moving to its own apex needs no rule edit. The listener default action is a fixed 404, so an unmatched request never falls through to another product's API.
 
@@ -62,8 +62,17 @@ The module exposes name-override inputs (`s3_bucket_name`, `target_group_name`, 
 `modules/product` takes `tier` = `prototype` | `product`. Prototypes live at
 `<slug>.protoapp.xyz` on the shared wildcard cert with 7-day logs and no alarms;
 products live on their own domain with their own cert, 90-day logs and two
-target-group alarms. Placement is enforced by a `validation` block on `domain`,
-not derived — `domain` stays a pure input so promotion is a three-line change.
+target-group alarms.
+
+Placement is a convention today, **not enforced**. `modules/product/variables.tf`
+has no validation tying `domain` to `tier` — only `tier`'s own enum check and
+`alerts_topic_arn`'s conditional. A `validation` block on `domain` is planned
+(checked against `tier`, not derived from it — `domain` stays a pure input so
+promotion is still a three-line change), but it ships in plan Task 6, which is
+**blocked**: turning it on today would fail `products/protoapp`, whose domain
+currently *is* the umbrella-zone apex. Until meerkat moves off `protoapp.xyz`
+and Task 6 lands, nothing in Terraform stops a prototype being pointed at a
+real domain or a product squatting the umbrella zone.
 
 Promotion needs a manually-created Cloudflare zone; Terraform owns everything
 downstream of that. The SNS email subscription requires a confirmation click
@@ -102,7 +111,7 @@ Two limits that bite here:
 
 ## In-flight work
 
-`docs/superpowers/specs/` and `docs/superpowers/plans/` (2026-07-25) describe a migration in progress: `products/protoapp` (currently the apex `protoapp.xyz`) becomes an ordinary product renamed **meerkat** at `meerkat.protoapp.xyz`, and sjocamp moves from `app.sjocamp.co` to `sjocamp.protoapp.xyz`. Some comments already say "meerkat" while the directory and SSM paths are still `protoapp` — read the spec before assuming either name is wrong.
+`docs/superpowers/specs/` and `docs/superpowers/plans/` (2026-07-25) describe a migration in progress: `products/protoapp` (currently the apex `protoapp.xyz`) becomes an ordinary product renamed **meerkat** at `meerkat.protoapp.xyz` (plan tasks 8-9, still pending). sjocamp is **not** moving — it is a product under the tier policy, and a product belongs on its own domain, which is where `app.sjocamp.co` already is; the plan's Task 10 (move sjocamp to `sjocamp.protoapp.xyz`) was retired for exactly that reason. Some comments already say "meerkat" while the directory and SSM paths are still `protoapp` — read the spec before assuming either name is wrong.
 
 ## Owner preferences
 

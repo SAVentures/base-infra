@@ -40,8 +40,12 @@ Every deployment is one of two tiers, set by `tier` on `modules/product`:
 | Alarms | none | no healthy hosts + target 5xx |
 
 A prototype is disposable and may break quietly. A product is shipped software
-and pages you. `modules/product` validates placement, so a prototype cannot be
-put on a real domain and a product cannot squat the umbrella zone.
+and pages you. Placement is a convention today, not a guarantee: `modules/product`
+does not yet validate that a prototype's domain sits under the umbrella zone or
+that a product's does not. That check is planned as a `validation` block on
+`domain` (plan Task 6), but it is blocked until `products/protoapp` moves off
+the `protoapp.xyz` apex — enabling it today would break that stack. Until then,
+a misplaced domain plans and applies without complaint.
 
 To promote a prototype, see the spec:
 `docs/superpowers/specs/2026-07-25-product-tiers-design.md`.
