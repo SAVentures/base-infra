@@ -337,7 +337,9 @@ terraform -chdir=platform validate
 terraform -chdir=platform plan
 ```
 
-Expected: three resources show `will be imported`, five `cloudflare_zone_setting` show `will be created`. **No resource may show `will be destroyed` or `must be replaced`.** If the ACM cert shows as created rather than imported, the ARN in Step 3 is wrong — stop and fix it.
+Expected: three resources show `will be imported`, five `cloudflare_zone_setting` show `will be created`. If the ACM cert shows as created rather than imported, the ARN in Step 3 is wrong — stop and fix it.
+
+**No resource may show `will be destroyed` or `must be replaced`, with one known exception:** `platform/` carries pre-existing AMI drift (see Task 3 Step 3) that replaces `aws_launch_configuration.app_launch_config_with_ssm` and updates the ASG in place. If that drift has not been resolved separately beforehand, those two entries are expected here too — and are the *only* permitted destroy/replace entries.
 
 - [ ] **Step 6: Apply platform, then release the product's claim**
 
@@ -517,7 +519,9 @@ terraform -chdir=platform validate
 terraform -chdir=platform plan
 ```
 
-Expected: exactly 3 to add, 0 to change, 0 to destroy. The new names (`shared-*`) cannot collide with the existing per-product names.
+Expected: 3 to add for this task's resources, and the new `shared-*` names cannot collide with the existing per-product names.
+
+**`platform/` carries pre-existing drift.** `image_id` on `aws_launch_configuration.app_launch_config_with_ssm` comes from SSM's latest-recommended-AMI pointer (`platform/ecs.tf:72`), so whenever AWS publishes a new ECS-optimized AMI the launch configuration shows `must be replaced` and the ASG shows an in-place update. This is unrelated to this task. Either resolve it before starting (apply it on its own so the change is attributable) or treat the expected plan as *3 additions plus exactly those two known drift entries* — and nothing else.
 
 - [ ] **Step 4: Apply and commit**
 
