@@ -87,8 +87,8 @@ resource "aws_ecs_service" "api" {
   load_balancer {
     container_name   = var.container_name_api
     container_port   = 80
-    target_group_arn = aws_lb_target_group.api.arn
+    target_group_arn = module.product.target_group_arn
   }
 
-  depends_on = [aws_lb_listener_rule.api]
+  depends_on = [module.product]
 }

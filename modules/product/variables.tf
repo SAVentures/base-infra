@@ -3,20 +3,9 @@ variable "product" {
   type        = string
 }
 
-variable "display_name" {
-  description = "Human-facing product name, surfaced in the SSM manifest"
-  type        = string
-}
-
 variable "domain" {
   description = "Fully-qualified domain this product serves. A pure input: nothing derives a hostname from any other source, so moving a product to its own apex is a one-line change."
   type        = string
-}
-
-variable "aws_region" {
-  description = "AWS region (must match platform)"
-  type        = string
-  default     = "us-east-1"
 }
 
 variable "environment" {
