@@ -48,36 +48,6 @@ resource "aws_cloudfront_origin_access_control" "webapp_oac" {
   signing_protocol                  = "sigv4"
 }
 
-resource "aws_cloudfront_function" "spa_routing" {
-  name    = "spa-routing-function"
-  runtime = "cloudfront-js-2.0"
-  comment = "Rewrite requests to index.html for SPA routing"
-  publish = true
-  code    = <<-EOT
-function handler(event) {
-    var request = event.request;
-    var uri = request.uri;
-
-    // Don't rewrite API requests
-    if (uri.startsWith('/api/')) {
-        return request;
-    }
-
-    // Check if the URI has a file extension (e.g., .js, .css, .png, .svg)
-    // If it does, it's a static asset, so don't rewrite
-    if (uri.includes('.')) {
-        return request;
-    }
-
-    // For all other requests (client-side routes), rewrite to index.html
-    // The URL in the browser stays unchanged, allowing TanStack Router to handle routing
-    request.uri = '/index.html';
-
-    return request;
-}
-EOT
-}
-
 resource "aws_cloudfront_distribution" "webapp_distribution" {
   enabled             = true
   is_ipv6_enabled     = true
@@ -160,57 +130,6 @@ resource "aws_cloudfront_distribution" "webapp_distribution" {
   tags = {
     Name        = "Webapp CloudFront Distribution"
     Environment = var.environment
-  }
-}
-
-resource "aws_cloudfront_cache_policy" "api_cache_policy" {
-  name        = "api-no-cache-policy"
-  comment     = "No caching for API requests"
-  default_ttl = 0
-  max_ttl     = 0
-  min_ttl     = 0
-
-  parameters_in_cache_key_and_forwarded_to_origin {
-    cookies_config {
-      cookie_behavior = "none"
-    }
-    headers_config {
-      header_behavior = "none"
-    }
-    query_strings_config {
-      query_string_behavior = "none"
-    }
-  }
-}
-
-resource "aws_cloudfront_origin_request_policy" "api_origin_request_policy" {
-  name    = "api-origin-request-policy"
-  comment = "Forward headers needed for API including viewer address, geo, and device info"
-
-  cookies_config {
-    cookie_behavior = "all"
-  }
-
-  headers_config {
-    header_behavior = "allViewerAndWhitelistCloudFront"
-    headers {
-      items = [
-        "CloudFront-Viewer-Address",
-        "CloudFront-Viewer-Country",
-        "CloudFront-Viewer-Country-Region",
-        "CloudFront-Viewer-City",
-        "CloudFront-Viewer-Postal-Code",
-        "CloudFront-Viewer-Metro-Code",
-        "CloudFront-Viewer-Time-Zone",
-        "CloudFront-Viewer-Latitude",
-        "CloudFront-Viewer-Longitude",
-        "CloudFront-Is-Mobile-Viewer",
-      ]
-    }
-  }
-
-  query_strings_config {
-    query_string_behavior = "all"
   }
 }
 
