@@ -1388,10 +1388,32 @@ moved {
   to   = module.product.aws_cloudwatch_log_group.cloudfront
 }
 
-# Legacy name: aws_alb_target_group, not aws_lb_target_group.
-moved {
+# The target group CANNOT use a `moved` block. protoapp declares it as
+# `aws_alb_target_group`, the module as `aws_lb_target_group`. Those map to the
+# same AWS API resource inside the provider, but `moved` compares TYPE NAMES,
+# not schemas, and Terraform 1.7.5 rejects it outright:
+#
+#   Error: Resource type mismatch
+#   This statement declares a move from aws_alb_target_group.ecs_target to
+#   module.product.aws_lb_target_group.api, which is a resource of a different type.
+#
+# Cross-type moves need Terraform >= 1.8 AND a provider that implements
+# MoveState for the pair; the AWS provider does not for this alias.
+#
+# Use `removed` + `import` instead. This keeps the property that actually
+# matters -- the state change is declarative and previewable with `terraform
+# plan` -- which `terraform state mv` would not, since it mutates state
+# immediately with no diff to review.
+removed {
   from = aws_alb_target_group.ecs_target
-  to   = module.product.aws_lb_target_group.api
+  lifecycle {
+    destroy = false
+  }
+}
+
+import {
+  to = module.product.aws_lb_target_group.api
+  id = "REPLACE_WITH_LIVE_TARGET_GROUP_ARN"
 }
 
 moved {
@@ -1405,7 +1427,11 @@ moved {
 }
 ```
 
-`aws_alb_target_group` and `aws_lb_target_group` are aliases for the same AWS API resource, so this move is valid.
+Capture the live target group ARN for the `import` block with:
+
+```bash
+terraform -chdir=products/protoapp state show aws_alb_target_group.ecs_target | grep -E '^\s+arn\s+='
+```
 
 `cloudflare_dns_record.www_to_cloudfront` stays in the product stack — the module manages exactly one record, and www is an extra alias.
 
