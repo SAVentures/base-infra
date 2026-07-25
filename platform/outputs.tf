@@ -87,3 +87,13 @@ output "zone_domain" {
   value       = var.zone_domain
   description = "Umbrella domain hosting all product subdomains"
 }
+
+output "alerts_topic_arn" {
+  value       = aws_sns_topic.alerts.arn
+  description = "Shared SNS topic for product alarms; consumed by modules/product"
+}
+
+output "alb_arn_suffix" {
+  value       = aws_lb.k8s_alb.arn_suffix
+  description = "ALB ARN suffix for CloudWatch dimensions. The alb_arn output is the full ARN and is NOT usable as a dimension."
+}
