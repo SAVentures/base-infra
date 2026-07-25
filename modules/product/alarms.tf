@@ -2,15 +2,15 @@
 # tier. Both alarms hang off the target group this module owns, so they answer
 # "is this product's API broken" without reaching into the product's stack.
 
-resource "aws_cloudwatch_metric_alarm" "unhealthy_hosts" {
+resource "aws_cloudwatch_metric_alarm" "no_healthy_hosts" {
   count = var.tier == "product" ? 1 : 0
 
-  alarm_name          = "${var.product}-unhealthy-hosts"
+  alarm_name          = "${var.product}-no-healthy-hosts"
   alarm_description   = "${var.product} has no healthy targets — the API is down."
   namespace           = "AWS/ApplicationELB"
-  metric_name         = "UnHealthyHostCount"
-  statistic           = "Maximum"
-  comparison_operator = "GreaterThanOrEqualToThreshold"
+  metric_name         = "HealthyHostCount"
+  statistic           = "Minimum"
+  comparison_operator = "LessThanThreshold"
   threshold           = 1
   period              = 60
   evaluation_periods  = 2

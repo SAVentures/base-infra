@@ -436,15 +436,15 @@ Create `modules/product/alarms.tf`:
 # tier. Both alarms hang off the target group this module owns, so they answer
 # "is this product's API broken" without reaching into the product's stack.
 
-resource "aws_cloudwatch_metric_alarm" "unhealthy_hosts" {
+resource "aws_cloudwatch_metric_alarm" "no_healthy_hosts" {
   count = var.tier == "product" ? 1 : 0
 
-  alarm_name          = "${var.product}-unhealthy-hosts"
+  alarm_name          = "${var.product}-no-healthy-hosts"
   alarm_description   = "${var.product} has no healthy targets — the API is down."
   namespace           = "AWS/ApplicationELB"
-  metric_name         = "UnHealthyHostCount"
-  statistic           = "Maximum"
-  comparison_operator = "GreaterThanOrEqualToThreshold"
+  metric_name         = "HealthyHostCount"
+  statistic           = "Minimum"
+  comparison_operator = "LessThanThreshold"
   threshold           = 1
   period              = 60
   evaluation_periods  = 2
@@ -517,7 +517,7 @@ Expected: `exit=0`. Both alarms are `count = 0` for a prototype.
 terraform -chdir=products/sjocamp plan -out=tfplan
 ```
 
-Expected: `Plan: 2 to add, 0 to change, 0 to destroy.` — `module.product.aws_cloudwatch_metric_alarm.unhealthy_hosts[0]` and `...target_5xx[0]`.
+Expected: `Plan: 2 to add, 0 to change, 0 to destroy.` — `module.product.aws_cloudwatch_metric_alarm.no_healthy_hosts[0]` and `...target_5xx[0]`.
 
 **Gate:** no replacements, no destroys.
 
@@ -532,7 +532,7 @@ aws cloudwatch describe-alarms \
   --query 'MetricAlarms[].{Name:AlarmName,State:StateValue,Actions:AlarmActions}' --output table
 ```
 
-Expected: two alarms, both `OK` or `INSUFFICIENT_DATA`, each with the platform SNS topic in `Actions`. `ALARM` on `sjocamp-unhealthy-hosts` means sjocamp is genuinely down — investigate before continuing.
+Expected: two alarms, both `OK` or `INSUFFICIENT_DATA`, each with the platform SNS topic in `Actions`. `ALARM` on `sjocamp-no-healthy-hosts` means sjocamp is genuinely down — investigate before continuing.
 
 - [ ] **Step 8: Commit**
 

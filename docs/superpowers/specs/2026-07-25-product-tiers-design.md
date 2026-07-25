@@ -191,7 +191,7 @@ Two alarms on the target group the module already owns, both
 
 | Alarm | Metric | Condition |
 |---|---|---|
-| Unhealthy hosts | `AWS/ApplicationELB` `UnHealthyHostCount` | `>= 1` for 2 consecutive periods |
+| No healthy hosts | `AWS/ApplicationELB` `HealthyHostCount` | `< 1` for 2 consecutive periods |
 | Target 5xx | `AWS/ApplicationELB` `HTTPCode_Target_5XX_Count` | `> 10` over 5 minutes |
 
 Both require `TargetGroup` and `LoadBalancer` dimensions, hence the new
