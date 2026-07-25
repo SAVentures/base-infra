@@ -57,6 +57,18 @@ Wire compute to the module via `load_balancer.target_group_arn = module.product.
 
 The module exposes name-override inputs (`s3_bucket_name`, `target_group_name`, `oac_name`, `log_group_name`). **Every one forces replacement if changed.** Existing products pass their live legacy names so migration plans as a no-op; new products omit them and get the convention. Dropping `s3_bucket_name = "protoapp.xyz-webapp"` from `products/protoapp/main.tf` destroys the bucket and rebuilds the distribution.
 
+## Tiers
+
+`modules/product` takes `tier` = `prototype` | `product`. Prototypes live at
+`<slug>.protoapp.xyz` on the shared wildcard cert with 7-day logs and no alarms;
+products live on their own domain with their own cert, 90-day logs and two
+target-group alarms. Placement is enforced by a `validation` block on `domain`,
+not derived — `domain` stays a pure input so promotion is a three-line change.
+
+Promotion needs a manually-created Cloudflare zone; Terraform owns everything
+downstream of that. The SNS email subscription requires a confirmation click
+that `apply` cannot perform.
+
 ## Secrets
 
 Secrets flow through variables sourced from a gitignored `secrets.auto.tfvars` (all `*.tfvars` are gitignored). **Never `aws ssm put-parameter` on a Terraform-managed parameter** — a hand-set value is invisible to the config and gets clobbered on the next apply.

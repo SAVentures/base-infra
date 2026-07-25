@@ -1770,7 +1770,12 @@ then the apex alias was dropped. protoapp.xyz is now free for the umbrella."
 
 ---
 
-## Task 10: Move sjocamp to sjocamp.protoapp.xyz
+## Task 10: Move sjocamp to sjocamp.protoapp.xyz — RETIRED, DO NOT EXECUTE
+
+> **Retired 2026-07-25.** Backwards under the tier policy: sjocamp shipped as
+> the first production product and belongs on its own domain, which is where it
+> already is. Kept rather than deleted so the history stays legible. See
+> `docs/superpowers/specs/2026-07-25-product-tiers-design.md`.
 
 Hard cutover with ~5-15 minutes of downtime on `app.sjocamp.co`. Serving both names would need a transition cert spanning two Cloudflare zones; that complexity is not worth buying for a personal project.
 

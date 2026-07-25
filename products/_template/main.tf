@@ -64,11 +64,16 @@ module "product" {
   product     = var.product
   domain      = "${var.product}.${data.terraform_remote_state.platform.outputs.zone_domain}"
   environment = var.environment
+  tier        = "prototype"
 
-  platform_alb_dns_name        = data.terraform_remote_state.platform.outputs.alb_dns_name
-  platform_alb_listener_arn    = data.terraform_remote_state.platform.outputs.alb_listener_http_arn
-  platform_vpc_id              = data.terraform_remote_state.platform.outputs.vpc_id
-  platform_acm_certificate_arn = data.terraform_remote_state.platform.outputs.acm_certificate_arn
+  umbrella_zone_domain = data.terraform_remote_state.platform.outputs.zone_domain
+
+  acm_certificate_arn     = data.terraform_remote_state.platform.outputs.acm_certificate_arn
+  platform_alb_arn_suffix = data.terraform_remote_state.platform.outputs.alb_arn_suffix
+
+  platform_alb_dns_name     = data.terraform_remote_state.platform.outputs.alb_dns_name
+  platform_alb_listener_arn = data.terraform_remote_state.platform.outputs.alb_listener_http_arn
+  platform_vpc_id           = data.terraform_remote_state.platform.outputs.vpc_id
 
   cloudflare_zone_id                  = data.terraform_remote_state.platform.outputs.cloudflare_zone_id
   cloudfront_cache_policy_id          = data.terraform_remote_state.platform.outputs.cloudfront_api_cache_policy_id

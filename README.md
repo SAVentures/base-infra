@@ -28,10 +28,25 @@ Routing (once multiple products exist): each product's CloudFront forwards `/api
 
 See [RUNBOOK.md](./RUNBOOK.md) for the protoapp state migration — how to move existing resources from the pre-split state into platform + products/protoapp without recreating anything.
 
-## Adding a new project
+## Tiers: prototype vs product
 
-Every project is a subdomain of `protoapp.xyz`: a static SPA on S3 + CloudFront
-with `/api/*` forwarded to the shared ALB.
+Every deployment is one of two tiers, set by `tier` on `modules/product`:
+
+| | prototype | product |
+|---|---|---|
+| Domain | `<slug>.protoapp.xyz` | its own domain |
+| Certificate | shared `*.protoapp.xyz` wildcard | its own, created in its stack |
+| Log retention | 7 days | 90 days |
+| Alarms | none | no healthy hosts + target 5xx |
+
+A prototype is disposable and may break quietly. A product is shipped software
+and pages you. `modules/product` validates placement, so a prototype cannot be
+put on a real domain and a product cannot squat the umbrella zone.
+
+To promote a prototype, see the spec:
+`docs/superpowers/specs/2026-07-25-product-tiers-design.md`.
+
+## Adding a new project
 
 1. `cp -r products/_template products/<slug>` and replace every `PROJECT_SLUG`
 2. Pick an unused `alb_rule_priority` — sjocamp 100, protoapp 200, new projects
