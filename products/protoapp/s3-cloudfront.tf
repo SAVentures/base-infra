@@ -152,7 +152,7 @@ resource "aws_cloudfront_distribution" "webapp_distribution" {
   }
 
   viewer_certificate {
-    acm_certificate_arn      = aws_acm_certificate.ssl_cert.arn
+    acm_certificate_arn      = data.terraform_remote_state.platform.outputs.acm_certificate_arn
     ssl_support_method       = "sni-only"
     minimum_protocol_version = "TLSv1.2_2021"
   }
