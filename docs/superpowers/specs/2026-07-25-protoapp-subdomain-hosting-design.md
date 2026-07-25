@@ -92,6 +92,18 @@ eliminates the entire name-collision class.
 The capture worker stays in `products/meerkat/`. It has one consumer; a
 `count`-gated block in a shared module would be speculative generality.
 
+**The SSM manifest stays per-product too.** It assembles the ECR repository, ECS
+cluster and service names, the landing domain, and per-product Sentry config —
+values that live in the product stack and differ per product. sjocamp's carries a
+`sentry` block; protoapp's carries `captureWorkerEcrRepository` and
+`captureWorkerEcsService`. A shared version would need roughly seven pass-through
+variables, and an under-scoped one silently drops fields that app repos and CI
+read at deploy time. Each product keeps its own `manifest.tf`, reading
+`module.product.webapp_bucket_id` and `module.product.cloudfront_distribution_id`
+for the two values the module owns. (Discovered during Task 6: the first draft of
+the module did absorb the manifest, and its slimmer schema would have dropped
+five live fields.)
+
 **The ECS task definition and service also stay per-product.** Their
 `environment` blocks are irreducibly product-specific — sjocamp injects Stripe
 billing-portal and Resend webhook values, meerkat injects eight social-platform

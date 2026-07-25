@@ -13,7 +13,11 @@
 ## Global Constraints
 
 - **This is Terraform, not application code.** The TDD cycle maps to: write config → `terraform validate` → `terraform plan` and assert on the diff → apply → verify against AWS. The plan *is* the test.
-- **Zero-diff gate:** `terraform plan -detailed-exitcode` exits `0` for no changes, `2` for changes present, `1` for error. Refactor tasks must exit `0`.
+- **The migration gate.** The property that matters is **nothing is replaced**, not literally zero diff. For the module migrations (Tasks 6 and 7):
+  - **No resource may show `must be replaced` or `will be destroyed`.** Absolute. A replaced `aws_s3_bucket` destroys live webapp assets; a replaced `aws_cloudfront_distribution` drops the site for ~20 minutes.
+  - Every remaining change must be `~ update in-place`, individually enumerated, with a stated reason it is non-functional.
+  - Expect a small set of deliberate cosmetic normalizations: `Name`/`Environment` tags aligned across products, an OAC `description` added, and the ALB origin's `origin_id` standardized to `ALB-API` (an internal identifier linking origin to cache behaviour — inert as long as both sides agree, which they do inside the module).
+  - `terraform plan -detailed-exitcode` exits `0` for no changes, `2` for changes present, `1` for error. Tasks that genuinely should be no-ops (e.g. Task 2's product half) still require exit `0`.
 - **Never approve a plan showing `must be replaced`** on: `aws_s3_bucket`, `aws_cloudfront_distribution`, `aws_lb_target_group`, `aws_ecs_service`. It means a missing name override.
 - **Region is `us-east-1`** for everything. CloudFront certs must live there.
 - **Each product keeps its own state bucket.** `platform` → `protoapp-infra-terraform-state`, protoapp/meerkat → `protoapp-terraform-state`, sjocamp → `sjocamp-terraform-state`. Do not rename state buckets.
@@ -77,7 +81,6 @@ routes), which genuinely return 200 from S3.
 | `modules/product/cloudfront.tf` | **new** — S3 bucket, policy, OAC, distribution |
 | `modules/product/alb-routing.tf` | **new** — target group + `X-Product-Id` listener rule |
 | `modules/product/domain.tf` | **new** — Cloudflare CNAME for the subdomain |
-| `modules/product/manifest.tf` | **new** — SSM `/{product}/manifest` |
 | `modules/product/outputs.tf` | **new** — target group ARN, distribution id, bucket id |
 | `products/sjocamp/main.tf` | + module call + `moved` blocks |
 | `products/meerkat/` | renamed from `products/protoapp/` |
@@ -674,7 +677,8 @@ resources, then removed the per-product duplicates."
 The module owns edge and routing only. Compute stays per-product — see the spec's "Target architecture" for why.
 
 **Files:**
-- Create: `modules/product/versions.tf`, `variables.tf`, `cloudfront.tf`, `alb-routing.tf`, `domain.tf`, `manifest.tf`, `outputs.tf`
+- Create: `modules/product/versions.tf`, `variables.tf`, `cloudfront.tf`, `alb-routing.tf`, `domain.tf`, `outputs.tf`
+- **NOT** created: `modules/product/manifest.tf`. The SSM manifest stays per-product — see note below.
 
 **Interfaces:**
 - Consumes: platform outputs from Tasks 2-3, passed in as variables.
@@ -1052,35 +1056,24 @@ resource "cloudflare_dns_record" "app" {
 
 `proxied = false` is required: CloudFront terminates TLS with the ACM cert, and the zone's SSL mode is `strict`.
 
-- [ ] **Step 5: Write modules/product/manifest.tf and outputs.tf**
+- [ ] **Step 5: Write modules/product/outputs.tf**
 
-`manifest.tf`:
+**The SSM manifest deliberately stays OUT of the module** — same reason as the
+ECS task definition and service. It assembles the ECR repository, ECS cluster and
+service names, the landing domain, and per-product Sentry config: values that
+live in the product stack and differ per product. sjocamp's manifest carries a
+`sentry` block; protoapp's carries `captureWorkerEcrRepository` and
+`captureWorkerEcsService`.
 
-```hcl
-# Machine-readable product descriptor consumed by app repos and CI so deploy
-# workflows need no hardcoded ids.
-resource "aws_ssm_parameter" "manifest" {
-  name = "/${var.product}/manifest"
-  type = "String"
-  tier = "Advanced"
-  value = jsonencode({
-    name = var.display_name
-    slug = var.product
-    domains = {
-      app = var.domain
-    }
-    aws = {
-      region                   = var.aws_region
-      webappS3Bucket           = aws_s3_bucket.webapp.id
-      cloudfrontDistributionId = aws_cloudfront_distribution.webapp.id
-    }
-    ssm = {
-      productPrefix  = "/${var.product}"
-      platformPrefix = "/platform"
-    }
-  })
-}
-```
+A shared version would need roughly seven pass-through variables — worse than the
+duplication it removes — and an under-scoped version silently drops fields that
+app repos and CI read at deploy time. Each product keeps its own `manifest.tf`,
+pulling the two values the module owns from
+`module.product.webapp_bucket_id` and `module.product.cloudfront_distribution_id`.
+
+Because the manifest is out, `var.display_name` and `var.aws_region` may have no
+remaining consumer inside the module. Grep before removing either — delete only
+what is genuinely unreferenced, and stop passing it from the product stacks.
 
 `outputs.tf`:
 
@@ -1141,7 +1134,7 @@ sjocamp first — it is the template the module was extracted from, so its diff 
 
 **Files:**
 - Modify: `products/sjocamp/main.tf` (module call + `moved` blocks)
-- Delete: `products/sjocamp/s3-cloudfront.tf`, `alb-routing.tf`, `manifest.tf`
+- Delete: `products/sjocamp/s3-cloudfront.tf`, `alb-routing.tf` (KEEP `manifest.tf`)
 - Modify: `products/sjocamp/domain.tf`, `ecs-service.tf`, `outputs.tf`
 
 **Interfaces:**
@@ -1245,7 +1238,8 @@ The `[0]` index on the DNS record is required — `manage_dns_record` makes it a
 - [ ] **Step 3: Delete the superseded files and fix references**
 
 ```bash
-git rm products/sjocamp/s3-cloudfront.tf products/sjocamp/alb-routing.tf products/sjocamp/manifest.tf
+git rm products/sjocamp/s3-cloudfront.tf products/sjocamp/alb-routing.tf
+# NOTE: manifest.tf is deliberately KEPT — see the module-boundary note in Task 5.
 ```
 
 In `products/sjocamp/domain.tf`, delete `cloudflare_dns_record.app_to_cloudfront` (the module owns it now). Keep the cert and its validation record.
@@ -1322,7 +1316,7 @@ Same mechanism as Task 6, but protoapp is the legacy stack with six hardcoded na
 
 **Files:**
 - Modify: `products/protoapp/main.tf`
-- Delete: `products/protoapp/s3-cloudfront.tf`, `alb-routing.tf`, `manifest.tf`
+- Delete: `products/protoapp/s3-cloudfront.tf`, `alb-routing.tf` (KEEP `manifest.tf`)
 - Modify: `products/protoapp/domain.tf`, `ecs-service.tf`, `capture-worker.tf`, `outputs.tf`
 
 **Interfaces:**
@@ -1432,7 +1426,8 @@ moved {
 - [ ] **Step 3: Delete superseded files and fix references**
 
 ```bash
-git rm products/protoapp/s3-cloudfront.tf products/protoapp/alb-routing.tf products/protoapp/manifest.tf
+git rm products/protoapp/s3-cloudfront.tf products/protoapp/alb-routing.tf
+# NOTE: manifest.tf is deliberately KEPT — see the module-boundary note in Task 5.
 ```
 
 In `products/protoapp/domain.tf`, delete `cloudflare_dns_record.root_to_cloudfront`. Keep `www_to_cloudfront` but repoint it:
