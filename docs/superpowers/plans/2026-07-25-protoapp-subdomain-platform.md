@@ -184,17 +184,27 @@ In `platform/main.tf`, inside `required_providers`:
     }
 ```
 
-In `platform/provider.tf`, append:
+In `platform/provider.tf`, append — this must match `products/protoapp/provider.tf` exactly, which authenticates with the Cloudflare *global API key* pulled from SSM plus an account email, **not** an API token from the environment:
 
 ```hcl
-provider "cloudflare" {}
-```
+data "aws_ssm_parameter" "cloudflare_api_key" {
+  name = "/cloudflare/api_key"
+}
 
-The provider reads `CLOUDFLARE_API_TOKEN` from the environment, matching how the product stacks already authenticate.
+provider "cloudflare" {
+  email   = var.cloudflare_email
+  api_key = data.aws_ssm_parameter.cloudflare_api_key.value
+}
+```
 
 In `platform/variables.tf`, append:
 
 ```hcl
+variable "cloudflare_email" {
+  description = "Cloudflare account email (paired with the global API key from /cloudflare/api_key)"
+  type        = string
+}
+
 variable "cloudflare_zone_id" {
   description = "Cloudflare zone ID for the umbrella zone (protoapp.xyz)"
   type        = string
