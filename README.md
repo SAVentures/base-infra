@@ -8,13 +8,13 @@ AWS infrastructure split into a shared platform stack and one Terraform stack pe
 infra-setup/
 ├── platform/               # shared: VPC, RDS, ECS cluster, ALB, Kafka, IAM
 └── products/
-    └── protoapp/           # protoapp-only: S3, CloudFront, ACM, ECS service, SSM, DNS
+    └── meerkat/            # meerkat-only: S3, CloudFront, ACM, ECS service, SSM, DNS
 ```
 
 ### State
 
 - **platform** state: `s3://protoapp-infra-terraform-state/state/terraform.tfstate` (unchanged from the pre-split setup)
-- **products/protoapp** state: `s3://protoapp-terraform-state/state/terraform.tfstate` (fresh bucket)
+- **products/meerkat** state: `s3://protoapp-terraform-state/state/terraform.tfstate` (bucket name predates the meerkat rename and is deliberately unchanged)
 
 Future products get their own state bucket and live in `products/<name>/`.
 
@@ -26,7 +26,7 @@ Routing (once multiple products exist): each product's CloudFront forwards `/api
 
 ## Getting started
 
-See [RUNBOOK.md](./RUNBOOK.md) for the protoapp state migration — how to move existing resources from the pre-split state into platform + products/protoapp without recreating anything.
+See [RUNBOOK.md](./RUNBOOK.md) for the original state migration — how existing resources moved from the pre-split state into platform + the product stack without recreating anything.
 
 ## Tiers: prototype vs product
 
@@ -43,7 +43,7 @@ A prototype is disposable and may break quietly. A product is shipped software
 and pages you. Placement is a convention today, not a guarantee: `modules/product`
 does not yet validate that a prototype's domain sits under the umbrella zone or
 that a product's does not. That check is planned as a `validation` block on
-`domain` (plan Task 6), but it is blocked until `products/protoapp` moves off
+`domain` (plan Task 6), but it is blocked until `products/meerkat` moves off
 the `protoapp.xyz` apex — enabling it today would break that stack. Until then,
 a misplaced domain plans and applies without complaint.
 
@@ -64,7 +64,7 @@ To promote a prototype, see the spec:
    the spec (`docs/superpowers/specs/2026-07-25-product-tiers-design.md`)
    for the exact steps.
 1. `cp -r products/_template products/<slug>` and replace every `PROJECT_SLUG`
-2. Pick an unused `alb_rule_priority` — sjocamp 100, protoapp 200, new projects
+2. Pick an unused `alb_rule_priority` — sjocamp 100, meerkat 200, new projects
    from 300 in steps of 10. AWS rejects duplicate priorities.
 3. `aws s3 mb s3://<slug>-terraform-state`
 4. Add the project's ECS task definition and service in `products/<slug>/`,

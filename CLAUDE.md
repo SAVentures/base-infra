@@ -14,9 +14,9 @@ Each directory under `platform/` and `products/*/` is its own root module with i
 
 ```bash
 terraform -chdir=platform init
-terraform -chdir=products/protoapp plan -out=tfplan   # save the plan
-terraform -chdir=products/protoapp apply tfplan       # apply exactly what you read
-terraform -chdir=products/protoapp plan -detailed-exitcode   # 0=clean 1=error 2=changes
+terraform -chdir=products/meerkat plan -out=tfplan   # save the plan
+terraform -chdir=products/meerkat apply tfplan       # apply exactly what you read
+terraform -chdir=products/meerkat plan -detailed-exitcode   # 0=clean 1=error 2=changes
 terraform fmt -recursive
 terraform -chdir=<stack> validate
 ```
@@ -32,7 +32,7 @@ There is no test suite and no CI for Terraform in this repo. The `.github/workfl
 | Stack | State bucket | Owns |
 |---|---|---|
 | `platform/` | `protoapp-infra-terraform-state` | VPC, subnets, RDS Postgres, ECS cluster, ALB + HTTP listener, Kafka, IAM, wildcard ACM cert, Cloudflare zone settings, shared CloudFront policies + SPA function, SNS alerts topic + email subscription |
-| `products/protoapp/` | `protoapp-terraform-state` | product resources |
+| `products/meerkat/` | `protoapp-terraform-state` | product resources (bucket name predates the rename) |
 | `products/sjocamp/` | `sjocamp-terraform-state` | product resources |
 | `modules/product/` | — | shared child module: S3, CloudFront, Cloudflare DNS record, ALB target group + listener rule, target-group CloudWatch alarms (products only) |
 | `products/_template/` | — | starting point for a new product; replace every `PROJECT_SLUG` |
@@ -45,7 +45,7 @@ Every product is served the same way regardless of tier: a static SPA on S3 + Cl
 
 CloudFront injects an `X-Product-Id: <slug>` header on the API origin. The ALB listener rule matches `path /api/*` **AND** that header — deliberately not `host_header`, so a product moving to its own apex needs no rule edit. The listener default action is a fixed 404, so an unmatched request never falls through to another product's API.
 
-`alb_rule_priority` must be unique account-wide; AWS rejects duplicates. Current allocation, verified against the live listener: **sjocamp 100, protoapp 200**, new projects from 300 in steps of 10.
+`alb_rule_priority` must be unique account-wide; AWS rejects duplicates. Current allocation, verified against the live listener: **sjocamp 100, meerkat 200**, new projects from 300 in steps of 10.
 
 The binding ceiling on products behind this ALB is **100 target groups per ALB, not adjustable** — not the rules quota.
 
@@ -55,7 +55,7 @@ The module owns edge and routing, plus the two target-group CloudWatch alarms (p
 
 Wire compute to the module via `load_balancer.target_group_arn = module.product.target_group_arn`.
 
-The module exposes name-override inputs (`s3_bucket_name`, `target_group_name`, `oac_name`, `log_group_name`). **Every one forces replacement if changed.** Existing products pass their live legacy names so migration plans as a no-op; new products omit them and get the convention. Dropping `s3_bucket_name = "protoapp.xyz-webapp"` from `products/protoapp/main.tf` destroys the bucket and rebuilds the distribution.
+The module exposes name-override inputs (`s3_bucket_name`, `target_group_name`, `oac_name`, `log_group_name`). **Every one forces replacement if changed.** Existing products pass their live legacy names so migration plans as a no-op; new products omit them and get the convention. Dropping `s3_bucket_name = "protoapp.xyz-webapp"` from `products/meerkat/main.tf` destroys the bucket and rebuilds the distribution.
 
 ## Tiers
 
@@ -69,7 +69,7 @@ has no validation tying `domain` to `tier` — only `tier`'s own enum check and
 `alerts_topic_arn`'s conditional. A `validation` block on `domain` is planned
 (checked against `tier`, not derived from it — `domain` stays a pure input so
 promotion is still a three-line change), but it ships in plan Task 6, which is
-**blocked**: turning it on today would fail `products/protoapp`, whose domain
+**blocked**: turning it on today would fail `products/meerkat`, whose domain
 currently *is* the umbrella-zone apex. Until meerkat moves off `protoapp.xyz`
 and Task 6 lands, nothing in Terraform stops a prototype being pointed at a
 real domain or a product squatting the umbrella zone.
@@ -104,7 +104,7 @@ Use declarative blocks, not CLI state commands, because they appear in a plan an
 
 Two limits that bite here:
 
-- **`moved` cannot cross resource types.** `aws_alb_target_group` → `aws_lb_target_group` is rejected even though it is the same AWS resource. `products/protoapp/main.tf` carries a `removed` + `import` pair for exactly this, with a comment explaining why — do not "fix" it back into a `moved` block.
+- **`moved` cannot cross resource types.** `aws_alb_target_group` → `aws_lb_target_group` is rejected even though it is the same AWS resource. `products/meerkat/main.tf` carries a `removed` + `import` pair for exactly this, with a comment explaining why — do not "fix" it back into a `moved` block.
 - **`moved` cannot cross state files.** Moving a resource between stacks is: import in the destination and apply → back up source state → remove from source config *and* state before any apply there → verify both.
 
 `create_before_destroy` fails on resources with a hardcoded unique `name` (the replacement collides with the original); it needs `name_prefix`.
@@ -115,7 +115,13 @@ Two limits that bite here:
 
 ## In-flight work
 
-`docs/superpowers/specs/` and `docs/superpowers/plans/` (2026-07-25) describe a migration in progress: `products/protoapp` (currently the apex `protoapp.xyz`) becomes an ordinary subdomain prototype renamed **meerkat** at `meerkat.protoapp.xyz` (plan tasks 8-9, still pending). sjocamp is **not** moving — it is a product under the tier policy, and a product belongs on its own domain, which is where `app.sjocamp.co` already is; the plan's Task 10 (move sjocamp to `sjocamp.protoapp.xyz`) was retired for exactly that reason. Some comments already say "meerkat" while the directory and SSM paths are still `protoapp` — read the spec before assuming either name is wrong.
+**Done (plan task 8):** the product formerly called `protoapp` is now **meerkat** — `products/meerkat/`, SSM under `/meerkat/*`, and `X-Product-Id: meerkat` on the ALB rule. Its state bucket is still `protoapp-terraform-state` and its ECR repo is still `protoapp-capture-worker`; both names are ForceNew and renaming them would destroy state and images for nothing.
+
+**Still pending (plan task 9):** meerkat continues to serve the umbrella apex `protoapp.xyz` (plus `www`). It needs to move to `meerkat.protoapp.xyz` so the apex belongs to no product. That move breaks nine external registrations — Google, X, LinkedIn, Meta, Threads, TikTok, Pinterest and GitHub OAuth callbacks, plus the Stripe webhook — so it is staged additively: both hostnames serve at once while those are re-registered, then the primary flips.
+
+Until task 9 lands, the tier placement validation (`modules/product`, plan Task 6 of the tiers plan) stays off, because meerkat's domain *is* the umbrella zone and would fail it.
+
+sjocamp is **not** moving — it is a product under the tier policy and belongs on its own domain, which is where `app.sjocamp.co` already is. The subdomain plan's Task 10 was retired for exactly that reason.
 
 ## Owner preferences
 
