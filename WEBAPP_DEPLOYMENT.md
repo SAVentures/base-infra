@@ -17,7 +17,7 @@ Both products need a rebuild after 2026-07-25: meerkat moved to a new domain,
 and both got new Google OAuth clients. A stale bundle points at a host that no
 longer resolves.
 
-**meerkat** (`protoapp.xyz-webapp`, distribution `E29P2UU1UDEGD0`):
+**meerkat** (`protoapp-meerkat-webapp`, distribution `E29P2UU1UDEGD0`):
 
 ```
 VITE_API_URL=https://meerkat.protoapp.xyz

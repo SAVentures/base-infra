@@ -55,7 +55,7 @@ The module owns edge and routing, plus the two target-group CloudWatch alarms (p
 
 Wire compute to the module via `load_balancer.target_group_arn = module.product.target_group_arn`.
 
-The module exposes name-override inputs (`s3_bucket_name`, `target_group_name`, `oac_name`, `log_group_name`). **Every one forces replacement if changed.** Existing products pass their live legacy names so migration plans as a no-op; new products omit them and get the convention. Dropping `s3_bucket_name = "protoapp.xyz-webapp"` from `products/meerkat/main.tf` destroys the bucket and rebuilds the distribution.
+The module exposes name-override inputs (`s3_bucket_name`, `target_group_name`, `oac_name`, `log_group_name`). **Every one forces replacement if changed.** Existing products pass their live legacy names so migration plans as a no-op; new products omit them and get the convention. Dropping one destroys and recreates the resource it names. Measured, when meerkat's `s3_bucket_name` override was removed on 2026-07-25: the bucket, its policy and its public-access block were replaced, while the CloudFront distribution updated **in place** — so the feared ~20-minute distribution rebuild did not occur for a bucket rename. Note the module sets no `force_destroy`, so the old bucket must be emptied first or the destroy fails with `BucketNotEmpty`.
 
 ## Tiers
 

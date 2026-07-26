@@ -52,9 +52,12 @@ module "product" {
   extra_aliases = []
 
   # Legacy hardcoded names. Every one of these forces replacement if omitted:
-  # the bucket would be destroyed and recreated empty, the distribution would
-  # take ~20 minutes to rebuild.
-  s3_bucket_name    = "protoapp.xyz-webapp"
+  # the distribution would take ~20 minutes to rebuild.
+  #
+  # s3_bucket_name is deliberately NOT overridden: meerkat takes the module
+  # convention, protoapp-meerkat-webapp. The old protoapp.xyz-webapp named a
+  # domain meerkat no longer serves. Renaming cost one bucket replacement,
+  # which is cheap because the contents are build output CI regenerates.
   target_group_name = "ecs-target-group"
   oac_name          = "webapp-oac"
   log_group_name    = "/aws/cloudfront/webapp"
