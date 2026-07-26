@@ -68,11 +68,13 @@ Placement is a convention today, **not enforced**. `modules/product/variables.tf
 has no validation tying `domain` to `tier` — only `tier`'s own enum check and
 `alerts_topic_arn`'s conditional. A `validation` block on `domain` is planned
 (checked against `tier`, not derived from it — `domain` stays a pure input so
-promotion is still a three-line change), but it ships in plan Task 6, which is
-**blocked**: turning it on today would fail `products/meerkat`, whose domain
-currently *is* the umbrella-zone apex. Until meerkat moves off `protoapp.xyz`
-and Task 6 lands, nothing in Terraform stops a prototype being pointed at a
-real domain or a product squatting the umbrella zone.
+promotion is still a three-line change). It ships in Task 6 of the tiers plan,
+which was blocked on meerkat leaving the umbrella apex — **that blocker cleared
+on 2026-07-25** when meerkat moved to `meerkat.protoapp.xyz`. Both stacks now
+satisfy the rule (`meerkat` → `meerkat.protoapp.xyz`, `sjocamp` →
+`app.sjocamp.co`), so Task 6 is ready to run but has not been run yet. Until it
+is, nothing in Terraform stops a prototype being pointed at a real domain or a
+product squatting the umbrella zone.
 
 Certificate is the same kind of convention, not an enforced rule: `acm_certificate_arn`
 is completely unconstrained, so a `tier = "product"` stack passing the platform
