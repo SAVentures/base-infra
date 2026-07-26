@@ -1701,7 +1701,7 @@ Start Meta and TikTok first — both gate redirect-domain changes behind app rev
 | TikTok | **app review required** |
 | Pinterest | per Pinterest app settings |
 | GitHub OAuth | `https://meerkat.protoapp.xyz/api/auth/github/callback` |
-| Stripe | webhook endpoint → `https://meerkat.protoapp.xyz/api/webhooks/stripe` |
+| Stripe | ✅ done 2026-07-25 — webhook endpoint → `https://meerkat.protoapp.xyz/api/billing/webhook` (the real route; the `/api/webhooks/stripe` guessed here originally was wrong) |
 
 - [ ] **Step 5: Flip the primary domain**
 
