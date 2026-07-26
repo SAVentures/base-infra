@@ -81,3 +81,41 @@ resource "aws_ssm_parameter" "default_email_sender_address" {
   type  = "String"
   value = var.default_email_sender_address
 }
+
+// --- Sentry (stubbed; see secret-variables.tf) ---
+//
+// count on emptiness matches stripe_billing_portal_config_id above: SSM rejects
+// an empty value, and an absent parameter is the honest representation of
+// "not configured" — a parameter holding "" reads as configured when it isn't.
+
+resource "aws_ssm_parameter" "sentry_webapp_dsn" {
+  count = var.sentry_webapp_dsn == "" ? 0 : 1
+
+  name  = "/${var.product}/sentry/webapp_dsn"
+  type  = "String"
+  value = var.sentry_webapp_dsn
+}
+
+resource "aws_ssm_parameter" "sentry_auth_token" {
+  count = var.sentry_auth_token == "" ? 0 : 1
+
+  name  = "/${var.product}/sentry/auth_token"
+  type  = "SecureString"
+  value = var.sentry_auth_token
+}
+
+resource "aws_ssm_parameter" "sentry_org" {
+  count = var.sentry_org == "" ? 0 : 1
+
+  name  = "/${var.product}/sentry/org"
+  type  = "String"
+  value = var.sentry_org
+}
+
+resource "aws_ssm_parameter" "sentry_webapp_project" {
+  count = var.sentry_webapp_project == "" ? 0 : 1
+
+  name  = "/${var.product}/sentry/webapp_project"
+  type  = "String"
+  value = var.sentry_webapp_project
+}
