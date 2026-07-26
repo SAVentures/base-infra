@@ -53,29 +53,47 @@ definitions directly. No tfvars round-trip and no manual re-seed on rotation.
 
 ## Bootstrap checklist
 
-Terraform brings up the edge, routing and secrets. These steps are what make it
-actually serve traffic, and none of them can be done by `apply`.
+Applied on 2026-07-26: edge, routing, secrets and both ECS services are live.
+`orca.protoapp.xyz` resolves, serves a valid certificate, and `/api/*` reaches
+`orca-api-tg` (it answers 503 rather than the listener's default 404, which is
+how you can tell the header-matched rule is firing).
 
-### 1. Replace the carried-over credentials
+Both ECR repositories are empty, so neither service can place a task yet. The
+steps below are what turn that into a working app; none can be done by `apply`.
 
-`secrets.auto.tfvars` was seeded from `tickuptoks/base-server/env.local` so the
-stack could apply. Three of those values are registered against a **different
-hostname** and will fail in production until re-issued for `orca.protoapp.xyz`:
+### 1. Register orca's own webhook endpoints
 
-| Value | Where to re-register | Redirect / endpoint |
-|---|---|---|
-| `google_client_id` + `google_client_secret` | Google Cloud Console → new OAuth client | `https://orca.protoapp.xyz/api/auth/google/callback` |
-| `stripe_webhook_secret` | Stripe → new live-mode webhook endpoint | `https://orca.protoapp.xyz/api/webhooks/stripe` |
-| `resend_webhook_secret` | Resend → new webhook endpoint | `https://orca.protoapp.xyz/api/webhooks/resend` |
+Current state of `secrets.auto.tfvars`:
 
-`jwt_secret` was generated fresh — do not copy meerkat's or sjocamp's.
-`default_email_sender_address` is `no-reply@protoapp.xyz`, already Resend-verified
-(meerkat sends from it).
-`stripe_billing_portal_config_id` is empty, which the app reads as "use the
-Stripe account default". Set it to a **live-mode** `bpc_*` if you want a
-product-specific portal; a test-mode config will not resolve in live mode.
+| Value | State |
+|---|---|
+| `google_client_id` / `google_client_secret` | **Done** — OAuth client issued for `orca.protoapp.xyz` |
+| `jwt_secret` | **Done** — generated fresh. Never copy a sibling's; it would make their sessions valid here |
+| `default_email_sender_address` | **Done** — `no-reply@protoapp.xyz`, already Resend-verified (meerkat sends from it) |
+| `stripe_webhook_secret` | **Placeholder** — copied from meerkat |
+| `resend_webhook_secret` | **Placeholder** — copied from sjocamp |
+| `stripe_billing_portal_config_id` | Empty → Stripe account default |
 
-Edit the file, then `terraform apply`.
+The two copied values put orca on the same live Stripe/Resend accounts as its
+siblings, which is what the platform-shared `stripe_secret_key` and
+`resend_api_key` expect — a strict improvement on the Stripe-CLI local-listen
+secret that was there before.
+
+**They do not make webhooks work.** A webhook signing secret is bound to the
+specific endpoint it was issued for, so orca's server will fail signature
+verification on anything delivered to `orca.protoapp.xyz`. Until orca has its
+own endpoints, subscription state changes will not reach the database:
+
+| Register | Endpoint |
+|---|---|
+| Stripe → new live-mode webhook endpoint | `https://orca.protoapp.xyz/api/webhooks/stripe` |
+| Resend → new webhook endpoint | `https://orca.protoapp.xyz/api/webhooks/resend` |
+
+Put each new signing secret in `secrets.auto.tfvars`, then `terraform apply`.
+
+Leave `stripe_billing_portal_config_id` empty unless you want a
+product-specific portal — a `bpc_*` borrowed from sjocamp would show sjocamp's
+products, and a test-mode config will not resolve in live mode at all.
 
 ### 2. Create the database
 
