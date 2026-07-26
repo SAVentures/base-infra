@@ -20,3 +20,29 @@ variable "zone_domain" {
   type        = string
   default     = "protoapp.xyz"
 }
+
+# GitHub Actions OIDC subject patterns allowed to assume the deploy role.
+#
+# The `owner@ID/repo@ID` entries are NOT redundant with the plain ones. GitHub
+# switched to immutable subject claims that embed owner and repository IDs
+# (https://github.blog/changelog/2026-04-23-immutable-subject-claims-for-github-actions-oidc-tokens/):
+# every repository created, renamed or transferred on or after 2026-07-15 emits
+#
+#   repo:SAVentures@167594521/tickuptoks@1312020530:ref:refs/heads/main
+#
+# which `repo:SAVentures/*` cannot match — the character after the org name is
+# `@`, not `/`. Repos predating the cutoff keep the old format, so both forms
+# have to be listed until every repository has rolled over.
+#
+# DMSAVentures is the org's former name and no longer resolves on GitHub; its
+# entry is left alone rather than cleaned up here, because removing a trust
+# subject is a security change that deserves its own review.
+variable "github_oidc_allowed_subjects" {
+  description = "sub claim patterns permitted to assume github-actions-admin-aws"
+  type        = list(string)
+  default = [
+    "repo:DMSAVentures/*",
+    "repo:SAVentures/*",
+    "repo:SAVentures@167594521/*",
+  ]
+}
