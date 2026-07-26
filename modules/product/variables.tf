@@ -6,6 +6,20 @@ variable "product" {
 variable "domain" {
   description = "Fully-qualified domain this product serves. A pure input: nothing derives a hostname from any other source, so moving a product to its own apex is a one-line change."
   type        = string
+
+  # Placement is CHECKED against tier, never derived from it. Deriving the
+  # hostname inside the module would undo the "pure input" property above and
+  # make promotion a rewrite instead of a one-line change; validating keeps
+  # both. A violation fails at plan time, before anything reaches AWS.
+  validation {
+    condition = var.tier == "prototype" ? (
+      var.domain == "${var.product}.${var.umbrella_zone_domain}"
+      ) : (
+      var.domain != var.umbrella_zone_domain &&
+      !endswith(var.domain, ".${var.umbrella_zone_domain}")
+    )
+    error_message = "A prototype must serve <product>.<umbrella zone>; a product must serve its own domain, not the umbrella zone or a subdomain of it."
+  }
 }
 
 variable "environment" {

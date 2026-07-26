@@ -64,17 +64,12 @@ The module exposes name-override inputs (`s3_bucket_name`, `target_group_name`, 
 products live on their own domain with their own cert, 90-day logs and two
 target-group alarms.
 
-Placement is a convention today, **not enforced**. `modules/product/variables.tf`
-has no validation tying `domain` to `tier` — only `tier`'s own enum check and
-`alerts_topic_arn`'s conditional. A `validation` block on `domain` is planned
-(checked against `tier`, not derived from it — `domain` stays a pure input so
-promotion is still a three-line change). It ships in Task 6 of the tiers plan,
-which was blocked on meerkat leaving the umbrella apex — **that blocker cleared
-on 2026-07-25** when meerkat moved to `meerkat.protoapp.xyz`. Both stacks now
-satisfy the rule (`meerkat` → `meerkat.protoapp.xyz`, `sjocamp` →
-`app.sjocamp.co`), so Task 6 is ready to run but has not been run yet. Until it
-is, nothing in Terraform stops a prototype being pointed at a real domain or a
-product squatting the umbrella zone.
+Placement **is enforced**. `modules/product/variables.tf` carries a `validation`
+block on `domain` that checks it against `tier`: a prototype must serve exactly
+`<slug>.protoapp.xyz`, and a product may not serve the umbrella zone or any
+subdomain of it. A violation fails at **plan** time, before anything reaches
+AWS. The check is a validation rather than a derived hostname on purpose —
+`domain` stays a pure input, so promotion remains a three-line change.
 
 Certificate is the same kind of convention, not an enforced rule: `acm_certificate_arn`
 is completely unconstrained, so a `tier = "product"` stack passing the platform

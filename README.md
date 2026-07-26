@@ -40,12 +40,10 @@ Every deployment is one of two tiers, set by `tier` on `modules/product`:
 | Alarms | none | no healthy hosts + target 5xx |
 
 A prototype is disposable and may break quietly. A product is shipped software
-and pages you. Placement is a convention today, not a guarantee: `modules/product`
-does not yet validate that a prototype's domain sits under the umbrella zone or
-that a product's does not. That check is planned as a `validation` block on
-`domain` (plan Task 6), but it is blocked until `products/meerkat` moves off
-the `protoapp.xyz` apex — enabling it today would break that stack. Until then,
-a misplaced domain plans and applies without complaint.
+and pages you. Placement is enforced: `modules/product` validates `domain`
+against `tier`, so a prototype cannot be pointed at a real domain and a product
+cannot squat the umbrella zone. A violation fails at plan time, before anything
+reaches AWS.
 
 Certificate is the same kind of convention, not an enforced rule: `acm_certificate_arn`
 is a completely unconstrained input. A `tier = "product"` stack that passes the

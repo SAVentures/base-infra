@@ -670,7 +670,7 @@ git commit -m "docs: document the prototype/product tiers, retire plan task 10"
 
 ---
 
-### Task 6: Enable placement enforcement — BLOCKED
+### Task 6: Enable placement enforcement — ✅ DONE 2026-07-25
 
 > **Do not start this task until Phase 2 is complete.** Phase 2 is tasks 8 and 9
 > of `docs/superpowers/plans/2026-07-25-protoapp-subdomain-platform.md`: rename
