@@ -1,4 +1,4 @@
-// Per-product SSM, under /protoapp/*.
+// Per-product SSM, under /meerkat/*.
 //
 // Secret values are supplied by Terraform variables sourced from a gitignored
 // `secrets.auto.tfvars`. Rotate by editing that file and running
@@ -7,41 +7,6 @@
 // Account-wide secrets (resend, openai, gemini, stripe keys, turnstile, db
 // master creds) live at /platform/* — see platform/shared-secrets.tf.
 
-// Import blocks adopt already-populated /protoapp/* params into state on first
-// apply after the original refactor. No-op on subsequent applies.
-
-import {
-  to = aws_ssm_parameter.db_name
-  id = "/protoapp/db_name"
-}
-import {
-  to = aws_ssm_parameter.jwt_secret
-  id = "/protoapp/jwt_secret"
-}
-import {
-  to = aws_ssm_parameter.google_client_id
-  id = "/protoapp/google_client_id"
-}
-import {
-  to = aws_ssm_parameter.google_client_secret
-  id = "/protoapp/google_client_secret"
-}
-import {
-  to = aws_ssm_parameter.google_redirect_uri
-  id = "/protoapp/google_redirect_uri"
-}
-import {
-  to = aws_ssm_parameter.web_app_uri
-  id = "/protoapp/web_app_uri"
-}
-import {
-  to = aws_ssm_parameter.stripe_webhook_secret
-  id = "/protoapp/stripe_webhook_secret"
-}
-import {
-  to = aws_ssm_parameter.default_email_sender_address
-  id = "/protoapp/default_email_sender_address"
-}
 
 // --- Derived from product / domain (always TF-managed) ---
 

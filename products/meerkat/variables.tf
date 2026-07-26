@@ -1,7 +1,7 @@
 variable "product" {
-  description = "Product identifier (used in resource names and SSM paths)"
+  description = "Product identifier (used in resource names, SSM paths and the X-Product-Id header)"
   type        = string
-  default     = "protoapp"
+  default     = "meerkat"
 }
 
 variable "domain_name" {
@@ -19,11 +19,11 @@ variable "aws_region" {
 variable "display_name" {
   description = "Human-facing product name (used in the SSM manifest the app repo reads)"
   type        = string
-  default     = "ProtoApp"
+  default     = "Meerkat"
 }
 
 variable "landing_domain" {
-  description = "Apex domain serving this product (protoapp has no separate landing — same as app)"
+  description = "Apex domain serving this product (meerkat has no separate landing — same as app)"
   type        = string
   default     = "protoapp.xyz"
 }
@@ -69,8 +69,12 @@ variable "ecr_repository_name" {
   default     = "base-server"
 }
 
+# Deliberately NOT renamed to meerkat-capture-worker. ECR repository names are
+# ForceNew: renaming destroys the repository and every image in it, leaving the
+# capture worker undeployable until CI pushes a fresh image. The name is
+# internal and invisible to users, so the rename buys nothing.
 variable "capture_worker_ecr_repository" {
-  description = "ECR repository holding the capture-worker image"
+  description = "ECR repository holding the capture-worker image. Keeps the protoapp- prefix on purpose; see comment above."
   type        = string
   default     = "protoapp-capture-worker"
 }

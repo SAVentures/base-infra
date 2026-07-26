@@ -120,9 +120,9 @@ resource "aws_iam_user_policy" "media_uploader_s3_access" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "BucketObjectAccess"
-        Effect = "Allow"
-        Action = ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"]
+        Sid      = "BucketObjectAccess"
+        Effect   = "Allow"
+        Action   = ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"]
         Resource = "${aws_s3_bucket.media.arn}/*"
       },
       {
@@ -142,9 +142,10 @@ import {
 
 # The secret was visible only at creation time. Terraform imports the public
 # attributes (id, status, create_date) but `secret` stays unknown. The app
-# doesn't read from TF — it reads from /protoapp/storage/s3_secret_access_key
-# in SSM (populated from secrets.auto.tfvars). Re-seed the tfvars + apply if
-# the access key is ever rotated.
+# reaches the container as the S3_SECRET_ACCESS_KEY env var, injected by
+# Terraform from aws_ssm_parameter.s3_secret_access_key (populated from
+# secrets.auto.tfvars). The container has no task role and never calls SSM
+# itself. Re-seed the tfvars + apply if the access key is ever rotated.
 resource "aws_iam_access_key" "media_uploader" {
   user = aws_iam_user.media_uploader.name
 }

@@ -47,8 +47,12 @@ module "product" {
 
   platform_alb_arn_suffix = data.terraform_remote_state.platform.outputs.alb_arn_suffix
 
-  # protoapp currently serves the apex plus www.
-  extra_aliases = ["www.${var.domain_name}"]
+  # Transitional: the apex stays primary while the nine external OAuth and
+  # webhook callbacks are re-registered against the new name. Both hostnames
+  # serve the same distribution throughout, so nothing breaks while Meta and
+  # TikTok sit in app review. The platform wildcard already covers
+  # meerkat.protoapp.xyz, so this costs no certificate work.
+  extra_aliases = ["www.${var.domain_name}", "meerkat.protoapp.xyz"]
 
   # Legacy hardcoded names. Every one of these forces replacement if omitted:
   # the bucket would be destroyed and recreated empty, the distribution would
@@ -136,6 +140,6 @@ moved {
 # aws_ssm_parameter.manifest is NOT moved into the module. The manifest
 # assembles ECR/ECS/capture-worker values that are irreducibly
 # product-specific (the same reason the module owns no ECS task definition
-# or service) — it stays in products/protoapp/manifest.tf, unmoved, only
+# or service) — it stays in products/meerkat/manifest.tf, unmoved, only
 # repointing its two module-owned fields (webapp bucket id, CloudFront
 # distribution id) to module.product outputs.
