@@ -25,7 +25,7 @@ variable "tier" {
 }
 
 variable "umbrella_zone_domain" {
-  description = "The umbrella zone (protoapp.xyz). Used only to validate placement."
+  description = "The umbrella zone (protoapp.xyz). Reserved for the placement validation in plan Task 6; nothing reads it yet."
   type        = string
 }
 

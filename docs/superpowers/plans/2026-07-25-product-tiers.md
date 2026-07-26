@@ -729,10 +729,12 @@ Expected: `exit=0` for both. A validation block creates nothing; it either passe
 This is the real test of this task — a validation that never fires is untested. Temporarily set `tier = "product"` in `products/meerkat/main.tf` and plan:
 
 ```bash
-terraform -chdir=products/meerkat plan -lock=false 2>&1 | grep -A3 "Invalid value"
+terraform -chdir=products/meerkat plan -lock=false 2>&1 | grep -A3 "not the umbrella zone or a subdomain of it"
 ```
 
-Expected: the plan **fails** with the placement error message, because a product may not serve a subdomain of the umbrella zone.
+Grep for that exact placement error text, not the generic `"Invalid value"` header. meerkat passes no `alerts_topic_arn`, so flipping it to `tier = "product"` *also* trips the pre-existing `alerts_topic_arn` validation (Task 2) — that error's header is "Invalid value" too, so a loose grep on that string would pass even if the placement check were broken or missing. Grepping the placement check's own error text is what actually proves this task's validation fired.
+
+Expected: the plan **fails** and the grep finds a match, because a product may not serve a subdomain of the umbrella zone.
 
 Then revert the file:
 

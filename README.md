@@ -47,11 +47,22 @@ that a product's does not. That check is planned as a `validation` block on
 the `protoapp.xyz` apex — enabling it today would break that stack. Until then,
 a misplaced domain plans and applies without complaint.
 
+Certificate is the same kind of convention, not an enforced rule: `acm_certificate_arn`
+is a completely unconstrained input. A `tier = "product"` stack that passes the
+platform wildcard cert plans and applies with no complaint from Terraform.
+
 To promote a prototype, see the spec:
 `docs/superpowers/specs/2026-07-25-product-tiers-design.md`.
 
 ## Adding a new project
 
+0. Decide the tier first. These steps produce a **prototype**: the template
+   hardcodes `tier = "prototype"`, uses the umbrella Cloudflare zone and the
+   shared wildcard cert, and passes no `alerts_topic_arn`. Starting straight
+   from a **product** is a different path — register the domain and change
+   four lines in the module call. See "Promotion: prototype → product" in
+   the spec (`docs/superpowers/specs/2026-07-25-product-tiers-design.md`)
+   for the exact steps.
 1. `cp -r products/_template products/<slug>` and replace every `PROJECT_SLUG`
 2. Pick an unused `alb_rule_priority` — sjocamp 100, protoapp 200, new projects
    from 300 in steps of 10. AWS rejects duplicate priorities.
@@ -65,7 +76,8 @@ To promote a prototype, see the spec:
 ### What the module does and does not cover
 
 `modules/product/` owns **edge and routing**: S3, CloudFront, Cloudflare DNS, the
-ALB target group and its `X-Product-Id` listener rule.
+ALB target group and its `X-Product-Id` listener rule, plus two target-group
+CloudWatch alarms (products only — see Tiers above).
 
 It deliberately excludes **compute** (ECS task definition and service) and the
 **SSM manifest**. Both are irreducibly product-specific — env blocks and manifest
@@ -98,4 +110,6 @@ The ALB allows 100 rules per listener, one per project — roughly 95 projects.
 | Cloudflare zone settings | platform |
 | Cloudflare DNS record | product (via `modules/product`) |
 | CloudFront cache/origin-request policies, SPA function | platform (shared) |
+| SNS alerts topic + email subscription | platform (shared) |
+| Target-group CloudWatch alarms | product (via `modules/product`, products only) |
 | SSM params | `/platform/*` for shared infra, per-product paths for each product |

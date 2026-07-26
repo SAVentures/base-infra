@@ -1,7 +1,7 @@
 # Product Tiers: prototype vs product
 
 **Date:** 2026-07-25
-**Status:** Approved, not yet implemented
+**Status:** Phase 1 implemented 2026-07-25; Phase 3 (placement validation) deferred — see Implementation sequencing.
 
 ## Goal
 
@@ -122,6 +122,12 @@ variable "platform_alb_arn_suffix" {
 ```
 
 ### Placement validation on `domain`
+
+**Not yet implemented.** This is plan Task 6, deliberately **BLOCKED** until the
+meerkat move (Phase 2) lands — enabling it today would break `products/protoapp`,
+whose domain is currently the umbrella zone apex itself. Everything else in this
+"Module contract changes" section shipped in Phase 1; this subsection describes
+the design only.
 
 ```hcl
 validation {

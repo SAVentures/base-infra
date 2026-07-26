@@ -31,10 +31,10 @@ There is no test suite and no CI for Terraform in this repo. The `.github/workfl
 
 | Stack | State bucket | Owns |
 |---|---|---|
-| `platform/` | `protoapp-infra-terraform-state` | VPC, subnets, RDS Postgres, ECS cluster, ALB + HTTP listener, Kafka, IAM, wildcard ACM cert, Cloudflare zone settings, shared CloudFront policies + SPA function |
+| `platform/` | `protoapp-infra-terraform-state` | VPC, subnets, RDS Postgres, ECS cluster, ALB + HTTP listener, Kafka, IAM, wildcard ACM cert, Cloudflare zone settings, shared CloudFront policies + SPA function, SNS alerts topic + email subscription |
 | `products/protoapp/` | `protoapp-terraform-state` | product resources |
 | `products/sjocamp/` | `sjocamp-terraform-state` | product resources |
-| `modules/product/` | — | shared child module: S3, CloudFront, Cloudflare DNS record, ALB target group + listener rule |
+| `modules/product/` | — | shared child module: S3, CloudFront, Cloudflare DNS record, ALB target group + listener rule, target-group CloudWatch alarms (products only) |
 | `products/_template/` | — | starting point for a new product; replace every `PROJECT_SLUG` |
 
 Product stacks read `platform/outputs.tf` through `data "terraform_remote_state"`. That read is **one-directional and invisible to the platform stack** — Terraform's dependency graph does not cross state files, so deleting a shared resource looks like an ordinary destroy in `platform/` with no hint that products consume it.
@@ -51,7 +51,7 @@ The binding ceiling on products behind this ALB is **100 target groups per ALB, 
 
 ## Module boundary — what `modules/product` deliberately excludes
 
-The module owns edge and routing only. ECS task definitions/services and the SSM manifest stay in each product directory, because their *content* is irreducibly per-product. Pulling them in would mean threading a large map of pass-through variables, and an under-specified shared manifest **silently drops fields** — a failure that never shows up as a replacement in a plan.
+The module owns edge and routing, plus the two target-group CloudWatch alarms (products only). ECS task definitions/services and the SSM manifest stay in each product directory, because their *content* is irreducibly per-product. Pulling them in would mean threading a large map of pass-through variables, and an under-specified shared manifest **silently drops fields** — a failure that never shows up as a replacement in a plan.
 
 Wire compute to the module via `load_balancer.target_group_arn = module.product.target_group_arn`.
 
@@ -73,6 +73,10 @@ promotion is still a three-line change), but it ships in plan Task 6, which is
 currently *is* the umbrella-zone apex. Until meerkat moves off `protoapp.xyz`
 and Task 6 lands, nothing in Terraform stops a prototype being pointed at a
 real domain or a product squatting the umbrella zone.
+
+Certificate is the same kind of convention, not an enforced rule: `acm_certificate_arn`
+is completely unconstrained, so a `tier = "product"` stack passing the platform
+wildcard cert plans and applies with no complaint.
 
 Promotion needs a manually-created Cloudflare zone; Terraform owns everything
 downstream of that. The SNS email subscription requires a confirmation click
@@ -111,7 +115,7 @@ Two limits that bite here:
 
 ## In-flight work
 
-`docs/superpowers/specs/` and `docs/superpowers/plans/` (2026-07-25) describe a migration in progress: `products/protoapp` (currently the apex `protoapp.xyz`) becomes an ordinary product renamed **meerkat** at `meerkat.protoapp.xyz` (plan tasks 8-9, still pending). sjocamp is **not** moving — it is a product under the tier policy, and a product belongs on its own domain, which is where `app.sjocamp.co` already is; the plan's Task 10 (move sjocamp to `sjocamp.protoapp.xyz`) was retired for exactly that reason. Some comments already say "meerkat" while the directory and SSM paths are still `protoapp` — read the spec before assuming either name is wrong.
+`docs/superpowers/specs/` and `docs/superpowers/plans/` (2026-07-25) describe a migration in progress: `products/protoapp` (currently the apex `protoapp.xyz`) becomes an ordinary subdomain prototype renamed **meerkat** at `meerkat.protoapp.xyz` (plan tasks 8-9, still pending). sjocamp is **not** moving — it is a product under the tier policy, and a product belongs on its own domain, which is where `app.sjocamp.co` already is; the plan's Task 10 (move sjocamp to `sjocamp.protoapp.xyz`) was retired for exactly that reason. Some comments already say "meerkat" while the directory and SSM paths are still `protoapp` — read the spec before assuming either name is wrong.
 
 ## Owner preferences
 
