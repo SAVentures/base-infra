@@ -1689,7 +1689,15 @@ All three must return 200 with a valid certificate — the wildcard covers the n
 
 - [ ] **Step 4: Re-register external callbacks**
 
-Start Meta and TikTok first — both gate redirect-domain changes behind app review, measured in days to weeks. The old URL stays live throughout, so nothing is blocked on them.
+**Scope reduced 2026-07-25.** The owner no longer uses the Meta/Instagram
+integrations and is the only user of the site, so the social-platform callbacks
+below are no longer blocking. The app-review wait on Meta and TikTok — the
+original reason this task was staged additively — no longer applies. **Google is
+the only callback that must be re-registered before the flip**, because it is
+the login provider; the rest can be fixed lazily or left broken.
+
+X was re-registered and its old URL removed, so X OAuth is broken until the
+flip. Accepted deliberately: single user, prototype tier.
 
 | Provider | New callback |
 |---|---|
