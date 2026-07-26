@@ -34,6 +34,7 @@ There is no test suite and no CI for Terraform in this repo. The `.github/workfl
 | `platform/` | `protoapp-infra-terraform-state` | VPC, subnets, RDS Postgres, ECS cluster, ALB + HTTP listener, Kafka, IAM, wildcard ACM cert, Cloudflare zone settings, shared CloudFront policies + SPA function, SNS alerts topic + email subscription |
 | `products/meerkat/` | `protoapp-terraform-state` | product resources (bucket name predates the rename) |
 | `products/sjocamp/` | `sjocamp-terraform-state` | product resources |
+| `products/orca/` | `protoapp-orca-terraform-state` | the tickuptoks app; two ECS services (API + Remotion render worker) and its own media bucket. See `products/orca/README.md`. |
 | `modules/product/` | — | shared child module: S3, CloudFront, Cloudflare DNS record, ALB target group + listener rule, target-group CloudWatch alarms (products only) |
 | `products/_template/` | — | starting point for a new product; replace every `PROJECT_SLUG` |
 
@@ -45,7 +46,9 @@ Every product is served the same way regardless of tier: a static SPA on S3 + Cl
 
 CloudFront injects an `X-Product-Id: <slug>` header on the API origin. The ALB listener rule matches `path /api/*` **AND** that header — deliberately not `host_header`, so a product moving to its own apex needs no rule edit. The listener default action is a fixed 404, so an unmatched request never falls through to another product's API.
 
-`alb_rule_priority` must be unique account-wide; AWS rejects duplicates. Current allocation, verified against the live listener: **sjocamp 100, meerkat 200**, new projects from 300 in steps of 10.
+`alb_rule_priority` must be unique account-wide; AWS rejects duplicates. Current allocation, verified against the live listener: **sjocamp 100, meerkat 200, orca 300**, new projects from 310 in steps of 10.
+
+A product's slug need not match its repo name — `orca` is the tickuptoks app. The slug is the infrastructure identity (subdomain, SSM prefix, `X-Product-Id`, resource names) and is also what the app sends as `PRODUCT_NAME` to tag its Stripe objects on the shared account.
 
 The binding ceiling on products behind this ALB is **100 target groups per ALB, not adjustable** — not the rules quota.
 
@@ -83,7 +86,7 @@ that `apply` cannot perform.
 
 Secrets flow through variables sourced from a gitignored `secrets.auto.tfvars` (all `*.tfvars` are gitignored). **Never `aws ssm put-parameter` on a Terraform-managed parameter** — a hand-set value is invisible to the config and gets clobbered on the next apply.
 
-- `/platform/*` — account-wide (RDS master creds, shared API keys)
+- `/platform/*` — account-wide (RDS master creds, shared API keys). AI keys live under `/platform/ai/*`: openai, gemini, and — added for orca — fal and elevenlabs.
 - `/<product>/*` — per-product
 - `/<product>/manifest` — a JSON descriptor of bucket names, distribution ids, ECR/ECS names. Deploy scripts read this instead of hardcoding ids (see WEBAPP_DEPLOYMENT.md).
 

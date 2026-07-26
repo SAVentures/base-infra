@@ -17,6 +17,16 @@ variable "gemini_api_key" {
   sensitive = true
 }
 
+variable "fal_api_key" {
+  type      = string
+  sensitive = true
+}
+
+variable "elevenlabs_api_key" {
+  type      = string
+  sensitive = true
+}
+
 variable "stripe_publishable_key" {
   type = string
 }

@@ -33,7 +33,22 @@ VITE_GOOGLE_CLIENT_ID=457623122746-4jpfr3n9dhbnrjoq7a48nt5c60psdo90.apps.googleu
 VITE_GOOGLE_REDIRECT_URL=https://app.sjocamp.co/api/auth/google/callback
 ```
 
-Shared by both (account-wide, from `/platform/*`):
+**orca** (`protoapp-orca-webapp`) — no hardcoded values here on purpose: its
+workflow (`orca-webapp.yml` in the tickuptoks repo) reads every one of these
+from the SSM manifest and `/orca/*` at build time, which is the pattern the two
+above should be migrated to.
+
+```
+VITE_API_URL=https://orca.protoapp.xyz
+VITE_GOOGLE_REDIRECT_URL=https://orca.protoapp.xyz/api/auth/google/callback
+VITE_GOOGLE_CLIENT_ID   <- ssm /orca/google_client_id
+VITE_APP_ENV=production
+```
+
+orca passes no `VITE_TURNSTILE_SITE_KEY` — tickuptoks does not use Turnstile —
+and no `VITE_SENTRY_DSN`, which makes its `initSentry()` a no-op.
+
+Shared by both meerkat and sjocamp (account-wide, from `/platform/*`):
 
 ```
 VITE_STRIPE_PUBLISHABLE_KEY=pk_live_51PxCuHP3M2g0n0x3rpcflZx5JgmeMo7Le4eQFEj2coL6EwODaZ4L0YsfUGm32hXjzMruRZtmQXqUlvHcz2ZsVCwZ00O8C2Is5h

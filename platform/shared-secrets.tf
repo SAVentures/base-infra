@@ -23,6 +23,25 @@ resource "aws_ssm_parameter" "shared_gemini_api_key" {
   value = var.gemini_api_key
 }
 
+// No /platform/ai/anthropic_api_key: orca's only Anthropic consumer is the
+// content-job script provider, which is opt-in (CONTENT_JOB_SCRIPT_PROVIDER
+// defaults to gemini) and treats the key as optional. An SSM parameter holding
+// a placeholder reads as configured when it isn't — add it when a real key exists.
+
+// Media-generation providers. Introduced for orca (tickuptoks); placed here
+// rather than /orca/* because the accounts are account-wide, not per-product.
+resource "aws_ssm_parameter" "shared_fal_api_key" {
+  name  = "/platform/ai/fal_api_key"
+  type  = "SecureString"
+  value = var.fal_api_key
+}
+
+resource "aws_ssm_parameter" "shared_elevenlabs_api_key" {
+  name  = "/platform/ai/elevenlabs_api_key"
+  type  = "SecureString"
+  value = var.elevenlabs_api_key
+}
+
 // Stripe account keys (publishable is public, secret is account-wide)
 resource "aws_ssm_parameter" "shared_stripe_publishable_key" {
   name  = "/platform/payments/stripe_publishable_key"
