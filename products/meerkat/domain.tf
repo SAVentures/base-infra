@@ -1,24 +1,9 @@
-# The apex (protoapp.xyz) CNAME to CloudFront is now owned by module.product
-# (cloudflare_dns_record.app), which also carries www as an extra alias on
-# the distribution. This record still points www's DNS at CloudFront.
-resource "cloudflare_dns_record" "www_to_cloudfront" {
-  zone_id = var.cloudflare_zone_id
-  name    = "www.${var.domain_name}"
-  type    = "CNAME"
-  content = module.product.cloudfront_domain_name
-  ttl     = 1
-  proxied = false
-}
-
-# Transitional record. Both protoapp.xyz and meerkat.protoapp.xyz resolve to the
-# same distribution while external OAuth callbacks are re-registered. Removed
-# once the primary flips to meerkat.protoapp.xyz and the module's own
-# cloudflare_dns_record.app takes over that name.
-resource "cloudflare_dns_record" "meerkat_subdomain" {
-  zone_id = var.cloudflare_zone_id
-  name    = "meerkat.protoapp.xyz"
-  type    = "CNAME"
-  content = module.product.cloudfront_domain_name
-  ttl     = 1
-  proxied = false
-}
+# meerkat's only DNS record is the module's own cloudflare_dns_record.app,
+# which points meerkat.protoapp.xyz at the distribution.
+#
+# The www record that used to live here pointed www.protoapp.xyz at this
+# distribution, from when meerkat served the umbrella apex. It was deleted when
+# meerkat moved to its subdomain: protoapp.xyz and www.protoapp.xyz now belong
+# to no product and are free for an umbrella page. Deliberately no redirect from
+# the old names — these are personal projects with no inbound links worth
+# preserving.

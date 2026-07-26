@@ -47,12 +47,9 @@ module "product" {
 
   platform_alb_arn_suffix = data.terraform_remote_state.platform.outputs.alb_arn_suffix
 
-  # Transitional: the apex stays primary while the nine external OAuth and
-  # webhook callbacks are re-registered against the new name. Both hostnames
-  # serve the same distribution throughout, so nothing breaks while Meta and
-  # TikTok sit in app review. The platform wildcard already covers
-  # meerkat.protoapp.xyz, so this costs no certificate work.
-  extra_aliases = ["www.${var.domain_name}", "meerkat.protoapp.xyz"]
+  # meerkat serves exactly one hostname now. The apex and www aliases were
+  # dropped when it moved off protoapp.xyz.
+  extra_aliases = []
 
   # Legacy hardcoded names. Every one of these forces replacement if omitted:
   # the bucket would be destroyed and recreated empty, the distribution would

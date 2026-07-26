@@ -5,9 +5,9 @@ variable "product" {
 }
 
 variable "domain_name" {
-  description = "Apex domain served by this product"
+  description = "Domain served by this product"
   type        = string
-  default     = "protoapp.xyz"
+  default     = "meerkat.protoapp.xyz"
 }
 
 variable "aws_region" {
@@ -23,9 +23,9 @@ variable "display_name" {
 }
 
 variable "landing_domain" {
-  description = "Apex domain serving this product (meerkat has no separate landing — same as app)"
+  description = "Domain serving this product (meerkat has no separate landing — same as app)"
   type        = string
-  default     = "protoapp.xyz"
+  default     = "meerkat.protoapp.xyz"
 }
 
 variable "cloudflare_email" {
